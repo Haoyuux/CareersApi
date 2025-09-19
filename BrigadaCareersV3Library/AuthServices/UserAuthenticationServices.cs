@@ -2,6 +2,7 @@
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
+using BrigadaCareersV3Library.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,18 +28,31 @@ namespace BrigadaCareersV3Library.AuthServices
         private readonly UserManager<ApplicationIdentityUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IConfiguration _configuration;
+        private readonly BrigadaCareersDbv3Context _context;
 
         public UserAuthenticationService(UserManager<ApplicationIdentityUser> userManager,
         RoleManager<IdentityRole> roleManager,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        BrigadaCareersDbv3Context context)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _configuration = configuration;
-
+            _context = context;
         }
 
         public async Task<string> RegisteredUser(UserDto register)
+        {
+            if (register.Id == Guid.Empty) 
+            {
+                await CreateUser(register);
+            }else 
+            {
+                await UpdateUserDetails(register);
+            }
+            return "Success";
+        }
+        public async Task<string> CreateUser(UserDto register) 
         {
             try
             {
@@ -47,6 +61,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     return "User Already Exists";
                 }
+
                 var user = new ApplicationIdentityUser
                 {
 
@@ -57,6 +72,28 @@ namespace BrigadaCareersV3Library.AuthServices
 
 
                 var result = await _userManager.CreateAsync(user, register.Password!);
+
+
+                if (result.Succeeded)
+                {
+
+                    var userDetails = new TblUserDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = Guid.Parse(user.Id),
+                        FirstName = register.UserName,
+                        LastName = register.UserName,
+                        EmailAddress = register.Email,
+                        IsActive = true,
+                        CreationTime = DateTime.UtcNow,
+
+
+                    };
+
+                    await _context.TblUserDetails.AddAsync(userDetails);
+                    await _context.SaveChangesAsync();
+
+                }
 
                 if (!result.Succeeded)
                 {
@@ -86,6 +123,10 @@ namespace BrigadaCareersV3Library.AuthServices
                 var msg = ex.Message;
                 return msg;
             }
+        }
+        public async Task<string> UpdateUserDetails(UserDto register) 
+        {
+            return null;
         }
         public async Task<string> RegisteredAdmin(RegisterUserDto register)
         {

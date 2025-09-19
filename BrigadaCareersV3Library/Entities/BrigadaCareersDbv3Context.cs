@@ -33,7 +33,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            optionsBuilder.UseSqlServer("HrmsConnection");
+            optionsBuilder.UseSqlServer("DefaultCon");
         }
     }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -106,10 +106,9 @@ public partial class BrigadaCareersDbv3Context : DbContext
 
         modelBuilder.Entity<TblUserDetail>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("Tbl_UserDetails");
+            entity.ToTable("Tbl_UserDetails");
 
+            entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.ContactNo).HasMaxLength(50);
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
         });

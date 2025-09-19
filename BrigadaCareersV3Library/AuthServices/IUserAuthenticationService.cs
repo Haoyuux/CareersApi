@@ -9,5 +9,7 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<UserLoginDto>> LoginAccount(RegisterUserDto login);
         Task<string> RegisteredAdmin(RegisterUserDto register);
         Task<string> RegisteredUser(UserDto register);
+        Task<string> CreateUser(UserDto register);
+        Task<string> UpdateUserDetails(UserDto register);
     }
 }
