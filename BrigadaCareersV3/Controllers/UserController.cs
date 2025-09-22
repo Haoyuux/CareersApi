@@ -19,6 +19,16 @@ namespace BrigadaCareersV3.Controllers
             _userAuthentication = userAuthentication;
         }
 
+        
+        private static CookieOptions BuildRefreshCookieOptions() => new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,              
+            SameSite = SameSiteMode.None, // allow cross-site
+            Expires = DateTime.UtcNow.AddDays(7),
+            Path = "/"
+        };
+
         [HttpPost("RegisterUser")]
         public async Task<ActionResult<ApiResponseMessage<string>>> RegisterUser(UserDto user)
         {
@@ -32,15 +42,11 @@ namespace BrigadaCareersV3.Controllers
             return Ok(_api);
         }
 
-        //[Authorize(Roles = UserRole.Admin)]
         [HttpPost("RegisterAdmin")]
         public async Task<ActionResult<ApiResponseMessage<string>>> RegisterAdmin(RegisterUserDto user)
         {
             var res = await _userAuthentication.RegisteredAdmin(user);
-            if (res != null)
-            {
-                return Ok(res);
-            }
+            if (res != null) return Ok(res);
             return BadRequest(res);
         }
 
@@ -52,19 +58,10 @@ namespace BrigadaCareersV3.Controllers
 
             if (result.IsSuccess && result.Data != null)
             {
-                // Set refresh token as HttpOnly cookie
-                var refreshTokenCookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = false, // Set to true in production with HTTPS
-                    SameSite = SameSiteMode.Strict,
-                    Expires = DateTime.UtcNow.AddDays(7), // Refresh token expires in 7 days
-                    Path = "/"
-                };
+                // Set refresh cookie with cross-site flags
+                Response.Cookies.Append("refreshToken", result.Data.newRefreshToken, BuildRefreshCookieOptions());
 
-                Response.Cookies.Append("refreshToken", result.Data.newRefreshToken, refreshTokenCookieOptions);
-
-                // Don't send refresh token in response body for security
+                // Never return the refresh token in the body
                 result.Data.newRefreshToken = null;
             }
 
@@ -75,27 +72,18 @@ namespace BrigadaCareersV3.Controllers
         [HttpPost("refresh-token")]
         public async Task<ActionResult<ApiResponseMessage<UserLoginDto>>> RefreshToken()
         {
-            // Get refresh token from HttpOnly cookie
-            var refreshToken = Request.Cookies["refreshToken"];
+            // Debugging aid (optional)
+            // Console.WriteLine($"[Refresh] Cookie present: {Request.Cookies.ContainsKey("refreshToken")}");
 
-            // Call service method
+            var refreshToken = Request.Cookies["refreshToken"];
             var result = await _userAuthentication.RefreshTokenAsync(refreshToken);
 
             if (result.IsSuccess && result.Data != null)
             {
-                // Update refresh token cookie with new token (token rotation)
-                var refreshTokenCookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = false, // Set to true in production with HTTPS
-                    SameSite = SameSiteMode.Strict,
-                    Expires = DateTime.UtcNow.AddDays(7),
-                    Path = "/"
-                };
+                // Rotate the cookie with same flags
+                Response.Cookies.Append("refreshToken", result.Data.newRefreshToken, BuildRefreshCookieOptions());
 
-                Response.Cookies.Append("refreshToken", result.Data.newRefreshToken, refreshTokenCookieOptions);
-
-                // Don't send refresh token in response
+                // Do not expose the new refresh token
                 result.Data.newRefreshToken = null;
 
                 return Ok(result);
@@ -109,18 +97,16 @@ namespace BrigadaCareersV3.Controllers
         public async Task<ActionResult<ApiResponseMessage<bool>>> Logout()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-
-            // Call service method
             var result = await _userAuthentication.LogoutAsync(refreshToken);
 
             if (result.IsSuccess)
             {
-                // Clear refresh token cookie
+                // Delete cookie with matching flags/path
                 Response.Cookies.Delete("refreshToken", new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = false, // Set to true in production with HTTPS
-                    SameSite = SameSiteMode.Strict,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
                     Path = "/"
                 });
 

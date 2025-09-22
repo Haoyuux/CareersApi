@@ -92,16 +92,9 @@ builder.Services.AddAuthentication(options =>
 });
 
 // CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowSpecificOrigin", policy =>
-    {
-        policy.WithOrigins("http://localhost:4200")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
+builder.Services.AddCors(o => o.AddPolicy("AllowSpa", p =>
+    p.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApiDocument(config =>
@@ -137,16 +130,10 @@ app.UseHttpsRedirection();
 
 
 app.UseRouting();
-//app.UseCors();
-app.UseCors(policy => policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
-//app.UseCors(policy => policy
-//    .WithOrigins("http://localhost:4200/")
-//    .AllowAnyHeader()
-//    .AllowAnyMethod());
-
-
-app.UseAuthentication();   
+app.UseCors("AllowSpa");   // before auth
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

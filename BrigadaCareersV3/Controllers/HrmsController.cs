@@ -41,12 +41,7 @@ namespace BrigadaCareersV3.Controllers
 
             return Ok(res);
 
-            //return Ok(new
-            //{
-            //    IsAuthenticated = User?.Identity?.IsAuthenticated ?? false,
-            //    Name = User?.Identity?.Name,
-            //    Claims = User?.Claims.Select(c => new { c.Type, c.Value })
-            //});
+
         }
 
 
