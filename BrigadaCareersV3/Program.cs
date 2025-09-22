@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,7 +66,28 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["JWT:ValidAudience"],
         ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecreteKey"]!))
+            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecreteKey"]!)),
+        NameClaimType = ClaimTypes.NameIdentifier,  // normalize id
+        RoleClaimType = ClaimTypes.Role
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = ctx =>
+        {
+            Console.WriteLine("Auth header: " + ctx.Request.Headers["Authorization"].ToString());
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = ctx =>
+        {
+            Console.WriteLine("JWT auth failed: " + ctx.Exception.Message);
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = ctx =>
+        {
+            Console.WriteLine("JWT validated for principal: " + (ctx.Principal?.Identity?.Name ?? "(no name)"));
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -123,7 +145,7 @@ app.UseCors(policy => policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin())
 //    .AllowAnyMethod());
 
 
-app.UseAuthentication();
+app.UseAuthentication();   
 app.UseAuthorization();
 app.MapControllers();
 

@@ -28,6 +28,27 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(res);
         }
 
+        [HttpGet("whoami")]
+        public IActionResult WhoAmI()
+        {
+
+            var res = new
+            {
+                IsAuthenticated = User?.Identity?.IsAuthenticated ?? false,
+                Name = User?.Identity?.Name,
+                Claims = User?.Claims.Select(c => new { c.Type, c.Value })
+            };
+
+            return Ok(res);
+
+            //return Ok(new
+            //{
+            //    IsAuthenticated = User?.Identity?.IsAuthenticated ?? false,
+            //    Name = User?.Identity?.Name,
+            //    Claims = User?.Claims.Select(c => new { c.Type, c.Value })
+            //});
+        }
+
 
     }
 }

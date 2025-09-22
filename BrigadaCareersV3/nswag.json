@@ -121,7 +121,7 @@
       "checksumCacheEnabled": false,
       "serviceHost": null,
       "serviceSchemes": null,
-      "output": "../../Angular/matdash-angular-free-v1/main/src/app/services/nswag/service-proxie.ts",
+      "output": "D:/Project/Github/Careers/CareersAngular/src/app/services/nswag/service-proxie.ts",
       "newLineBehavior": "Auto"
 
     }
