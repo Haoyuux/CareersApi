@@ -27,7 +27,19 @@ public partial class BrigadaCareersDbv3Context : DbContext
 
     public virtual DbSet<AspNetUserToken> AspNetUserTokens { get; set; }
 
+    public virtual DbSet<TblAppbinary> TblAppbinaries { get; set; }
+
+    public virtual DbSet<TblCertificate> TblCertificates { get; set; }
+
+    public virtual DbSet<TblCertificateType> TblCertificateTypes { get; set; }
+
+    public virtual DbSet<TblEducation> TblEducations { get; set; }
+
     public virtual DbSet<TblUserDetail> TblUserDetails { get; set; }
+
+    public virtual DbSet<TblUserResume> TblUserResumes { get; set; }
+
+    public virtual DbSet<TblWorkExperience> TblWorkExperiences { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -104,6 +116,72 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.AspNetUserTokens).HasForeignKey(d => d.UserId);
         });
 
+        modelBuilder.Entity<TblAppbinary>(entity =>
+        {
+            entity.ToTable("Tbl_Appbinary");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.DateUpload).HasColumnType("datetime");
+            entity.Property(e => e.Description).IsUnicode(false);
+            entity.Property(e => e.FileName).IsUnicode(false);
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+        });
+
+        modelBuilder.Entity<TblCertificate>(entity =>
+        {
+            entity.ToTable("Tbl_Certificate");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.DateAchieved).HasColumnType("datetime");
+            entity.Property(e => e.Description).IsUnicode(false);
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+
+            entity.HasOne(d => d.CertificateType).WithMany(p => p.TblCertificates)
+                .HasForeignKey(d => d.CertificateTypeId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_Certificate_Tbl_Appbinary1");
+
+            entity.HasOne(d => d.CertificateTypeNavigation).WithMany(p => p.TblCertificates)
+                .HasForeignKey(d => d.CertificateTypeId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_Certificate_Tbl_CertificateType");
+
+            entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblCertificates)
+                .HasForeignKey(d => d.UserIdFk)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_Certificate_Tbl_UserDetails1");
+        });
+
+        modelBuilder.Entity<TblCertificateType>(entity =>
+        {
+            entity.ToTable("Tbl_CertificateType");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.Name).IsUnicode(false);
+        });
+
+        modelBuilder.Entity<TblEducation>(entity =>
+        {
+            entity.ToTable("Tbl_Education");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.Course).IsUnicode(false);
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.EducationLevel).IsUnicode(false);
+            entity.Property(e => e.EndDate).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.StartDate).HasColumnType("datetime");
+
+            entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblEducations)
+                .HasForeignKey(d => d.UserIdFk)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_Education_Tbl_UserDetails");
+        });
+
         modelBuilder.Entity<TblUserDetail>(entity =>
         {
             entity.ToTable("Tbl_UserDetails");
@@ -111,6 +189,49 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.ContactNo).HasMaxLength(50);
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
+
+            entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetails)
+                .HasForeignKey(d => d.UserProfileImageId)
+                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary");
+        });
+
+        modelBuilder.Entity<TblUserResume>(entity =>
+        {
+            entity.ToTable("Tbl_UserResume");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+
+            entity.HasOne(d => d.Attachment).WithMany(p => p.TblUserResumes)
+                .HasForeignKey(d => d.AttachmentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_UserResume_Tbl_Appbinary");
+
+            entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblUserResumes)
+                .HasForeignKey(d => d.UserIdFk)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_UserResume_Tbl_UserDetails");
+        });
+
+        modelBuilder.Entity<TblWorkExperience>(entity =>
+        {
+            entity.ToTable("Tbl_WorkExperience");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CompanyAddress).IsUnicode(false);
+            entity.Property(e => e.CompanyName).IsUnicode(false);
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.EndDate).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.JobDescription).IsUnicode(false);
+            entity.Property(e => e.JobTitle).IsUnicode(false);
+            entity.Property(e => e.StartDate).HasColumnType("datetime");
+
+            entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblWorkExperiences)
+                .HasForeignKey(d => d.UserIdFk)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_WorkExperience_Tbl_UserDetails1");
         });
 
         OnModelCreatingPartial(modelBuilder);

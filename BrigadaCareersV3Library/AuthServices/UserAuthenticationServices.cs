@@ -336,7 +336,7 @@ namespace BrigadaCareersV3Library.AuthServices
             return newToken;
         }
 
-        // ✅ O(1) lookup using AspNetUserTokens
+
         private async Task<ApplicationIdentityUser?> FindUserByRefreshTokenAsync(string refreshToken)
         {
             var row = await _identityDb.Set<IdentityUserToken<string>>()
@@ -373,16 +373,6 @@ namespace BrigadaCareersV3Library.AuthServices
             try
             {
                 var currentUserId = GetCurrentUserId();
-                var identityUser = await _userManager.FindByIdAsync(currentUserId);
-                if (identityUser == null)
-                {
-                    return new ApiResponseMessage<getUserProfileDetailsDto>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        ErrorMessage = "User not found in identity system"
-                    };
-                }
 
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == Guid.Parse(currentUserId));
@@ -397,8 +387,21 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                // Map as needed—returning empty success for now
-                return new ApiResponseMessage<getUserProfileDetailsDto> { Data = null, IsSuccess = true, ErrorMessage = "" };
+                var getDetails = new getUserProfileDetailsDto
+                {
+                    FirstName = userDetails.FirstName,
+                    LastName = userDetails.LastName,
+                    
+                };
+                
+
+              
+                return new ApiResponseMessage<getUserProfileDetailsDto> 
+                { 
+                   Data = getDetails, 
+                   IsSuccess = true, 
+                   ErrorMessage = ""
+                };
             }
             catch (Exception ex)
             {
@@ -426,6 +429,12 @@ namespace BrigadaCareersV3Library.AuthServices
             {
                 var available = string.Join(", ", user.Claims.Select(c => $"{c.Type}={c.Value}"));
                 throw new InvalidOperationException("User ID claim is missing from the authentication token. Available claims: " + available);
+            }
+
+            var identityUser = _userManager.FindByIdAsync(userId);
+            if (identityUser == null)
+            {
+                throw new Exception("User not found in identity system");
             }
 
             return userId;

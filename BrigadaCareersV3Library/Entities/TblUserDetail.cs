@@ -40,4 +40,16 @@ public partial class TblUserDetail
     public string? StreetDetails { get; set; }
 
     public Guid UserId { get; set; }
+
+    public Guid? UserProfileImageId { get; set; }
+
+    public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
+
+    public virtual ICollection<TblEducation> TblEducations { get; set; } = new List<TblEducation>();
+
+    public virtual ICollection<TblUserResume> TblUserResumes { get; set; } = new List<TblUserResume>();
+
+    public virtual ICollection<TblWorkExperience> TblWorkExperiences { get; set; } = new List<TblWorkExperience>();
+
+    public virtual TblAppbinary? UserProfileImage { get; set; }
 }
