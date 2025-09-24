@@ -8,6 +8,7 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
 {
     public class getUserProfileDetailsDto
     {
+        public Guid Id { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string ContactNo { get; set; }

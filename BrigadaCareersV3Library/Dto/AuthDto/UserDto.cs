@@ -10,9 +10,19 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
     {
         public Guid Id { get; set; }
         public string? FirstName { get; set; }
-        public string? Lastname { get; set; }
+        public string? LastName { get; set; }
+        public string? MiddleName { get; set; }
+        public string? ContactNo { get; set; }
         public string? UserName { get; set; }
         public string? Password { get; set; }
         public string? Email { get; set; }
+
+        public DateTime? DateOfBirth { get; set; }
+        public Guid? Hr201GenderId { get; set; }
+        public Guid? Hr201CivilStatus { get; set; }
+        public string? Address { get; set; }
+        public string? AboutMe { get; set; }
+        public string? StreetDetails { get; set; }
+        public byte[] UserProfileByte { get; set; }
     }
 }

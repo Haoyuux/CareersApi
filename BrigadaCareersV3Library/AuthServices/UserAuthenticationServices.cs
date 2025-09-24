@@ -105,10 +105,28 @@ namespace BrigadaCareersV3Library.AuthServices
             }
         }
 
-        public async Task<string> UpdateUserDetails(UserDto register)
+        public async Task UpdateUserDetails(UserDto register)
         {
-            // implement as needed
-            return null!;
+
+            var getDetails = await _appContext.TblUserDetails.Where(x => x.UserId == register.Id).FirstOrDefaultAsync();
+            if (getDetails is not null)
+            {
+                getDetails.FirstName = register.FirstName;
+                getDetails.LastName = register.LastName;
+                getDetails.MiddleName = register.MiddleName;
+                getDetails.ContactNo = register.ContactNo;
+                getDetails.DateOfBirth = register.DateOfBirth;
+
+            }
+            else 
+            {
+                throw new Exception("No User Details");
+            }
+
+            await _appContext.SaveChangesAsync();
+          
+
+           
         }
 
         public async Task<string> RegisteredAdmin(RegisterUserDto register)
@@ -184,7 +202,6 @@ namespace BrigadaCareersV3Library.AuthServices
             }
         }
 
-        // 🔄 Refresh using cookie
         public async Task<ApiResponseMessage<UserLoginDto>> RefreshTokenAsync(string refreshToken)
         {
             try
@@ -199,7 +216,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                // ✅ O(1) lookup in AspNetUserTokens
+             
                 var user = await FindUserByRefreshTokenAsync(refreshToken);
                 if (user == null)
                 {
@@ -211,7 +228,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                // ✅ Verify token against the provider (enforces lifespan)
+              
                 var isValidRefreshToken = await ValidateRefreshTokenAsync(user, refreshToken);
                 if (!isValidRefreshToken)
                 {
@@ -316,8 +333,6 @@ namespace BrigadaCareersV3Library.AuthServices
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
-        // ✅ Generate & persist the refresh token via Identity's token store
         private async Task<string> GenerateRefreshToken(ApplicationIdentityUser user)
         {
             // Remove current value (keyed by UserId + provider + name)
@@ -335,8 +350,6 @@ namespace BrigadaCareersV3Library.AuthServices
 
             return newToken;
         }
-
-
         private async Task<ApplicationIdentityUser?> FindUserByRefreshTokenAsync(string refreshToken)
         {
             var row = await _identityDb.Set<IdentityUserToken<string>>()
@@ -349,13 +362,11 @@ namespace BrigadaCareersV3Library.AuthServices
             if (row == null) return null;
             return await _userManager.FindByIdAsync(row.UserId);
         }
-
         private async Task<bool> ValidateRefreshTokenAsync(ApplicationIdentityUser user, string refreshToken)
         {
             // Enforces DataProtectionTokenProvider lifespan (configure to 7 days in Program.cs)
             return await _userManager.VerifyUserTokenAsync(user, RefreshLoginProvider, RefreshTokenName, refreshToken);
         }
-
         private async Task RemoveRefreshTokenAsync(ApplicationIdentityUser user)
         {
             try
@@ -367,8 +378,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 // ignore cleanup failures
             }
         }
-
-        public async Task<ApiResponseMessage<getUserProfileDetailsDto>> getUserProfileDetails()
+        public async Task<ApiResponseMessage<UserDto>> getUserProfileDetails()
         {
             try
             {
@@ -377,9 +387,19 @@ namespace BrigadaCareersV3Library.AuthServices
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == Guid.Parse(currentUserId));
 
+                var result = await
+                    (from u in _appContext.AspNetUsers
+                     join d in _appContext.TblUserDetails on u.Id equals d.UserId.ToString()
+                     join a in _appContext.TblAppbinaries on d.UserProfileImageId equals a.Id into appbinaryJoin
+                     from appbinary in appbinaryJoin.DefaultIfEmpty() 
+                     where u.Id == currentUserId
+                     select new { User = u, Details = d, AppBinary = appbinary })
+                    .FirstOrDefaultAsync();
+
+
                 if (userDetails == null)
                 {
-                    return new ApiResponseMessage<getUserProfileDetailsDto>
+                    return new ApiResponseMessage<UserDto>
                     {
                         Data = null,
                         IsSuccess = false,
@@ -387,16 +407,22 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                var getDetails = new getUserProfileDetailsDto
+                var getDetails = new UserDto
                 {
-                    FirstName = userDetails.FirstName,
-                    LastName = userDetails.LastName,
-                    
+                    Id = Guid.Parse(result.User.Id),
+                    FirstName = result.Details.FirstName,
+                    LastName = result.Details.LastName,
+                    Email = result.User.Email,
+                    MiddleName = result.Details.MiddleName,
+                    ContactNo = result.Details.ContactNo,
+                    UserProfileByte = result.AppBinary != null ? result.AppBinary.Byte : null
+
+
                 };
                 
 
               
-                return new ApiResponseMessage<getUserProfileDetailsDto> 
+                return new ApiResponseMessage<UserDto> 
                 { 
                    Data = getDetails, 
                    IsSuccess = true, 
@@ -405,10 +431,9 @@ namespace BrigadaCareersV3Library.AuthServices
             }
             catch (Exception ex)
             {
-                return new ApiResponseMessage<getUserProfileDetailsDto> { Data = null, IsSuccess = false, ErrorMessage = ex.Message };
+                return new ApiResponseMessage<UserDto> { Data = null, IsSuccess = false, ErrorMessage = ex.Message };
             }
         }
-
         public string GetCurrentUserId()
         {
             var httpContext = _httpContextAccessor.HttpContext
@@ -438,6 +463,193 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
             return userId;
+        }
+
+        public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
+        {
+            var response = new ApiResponseMessage<string>();
+
+            try
+            {
+                var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                var userGuid = Guid.Parse(currentUserId);
+
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == userGuid);
+
+                if (userDetails == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "User not found";
+                    return response;
+                }
+
+                var hasNewImage = !string.IsNullOrEmpty(input.ProfileImageBase64);
+
+                // 1) Remove only
+                if (input.RemoveProfileImage && !hasNewImage)
+                {
+                    if (userDetails.UserProfileImageId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
+                        userDetails.UserProfileImageId = null;
+                    }
+
+                    await _appContext.SaveChangesAsync();
+
+                    response.Data = "Removed";
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+                // 2) Replace / 3) Insert or Update
+                if (hasNewImage)
+                {
+                    if (input.RemoveProfileImage && userDetails.UserProfileImageId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
+                        userDetails.UserProfileImageId = null;
+                    }
+
+                    if (userDetails.UserProfileImageId == null)
+                    {
+                        var newId = await UploadNewProfileImageAsync(
+                            input.ProfileImageBase64,
+                            input.ProfileImageFileName,
+                            input.ProfileImageContentType);
+
+                        userDetails.UserProfileImageId = newId;
+                        response.Data = "Inserted";
+                    }
+                    else
+                    {
+                        await UpdateProfileImageAsync(
+                            userDetails.UserProfileImageId.Value,
+                            input.ProfileImageBase64,
+                            input.ProfileImageFileName,
+                            input.ProfileImageContentType);
+
+                        response.Data = input.RemoveProfileImage ? "Replaced" : "Updated";
+                    }
+
+                    await _appContext.SaveChangesAsync();
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+             
+                response.Data = "No changes";
+                response.IsSuccess = true;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.IsSuccess = false;
+                response.ErrorMessage = ex.Message;
+                return response;
+            }
+        }
+
+
+
+        // CREATE: returns new Guid
+        private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType)
+        {
+            try
+            {
+                var base64Content = base64Data.Contains(",") ? base64Data.Split(',')[1] : base64Data;
+                var fileBytes = Convert.FromBase64String(base64Content);
+                var fileExtension = GetFileExtension(contentType, fileName);
+
+                var binaryId = Guid.NewGuid();
+                var safeFileName = (fileName ?? $"profile_image_{DateTime.UtcNow:yyyyMMddHHmmss}{fileExtension}");
+                var appBinary = new TblAppbinary
+                {
+                    Id = binaryId,
+                    FileName = safeFileName.Substring(0, Math.Min(255, safeFileName.Length)),
+                    Byte = fileBytes,
+                    DateUpload = DateTime.UtcNow,
+                    IsDeleted = false,
+                    Description = "User Profile Image".Substring(0, Math.Min(500, "User Profile Image".Length)),
+                    CreationTime = DateTime.UtcNow
+                };
+
+                _appContext.TblAppbinaries.Add(appBinary);
+                await _appContext.SaveChangesAsync();
+
+                return binaryId;
+            }
+            catch (Exception ex)
+            {
+                var inner = ex.InnerException?.Message ?? "No inner exception";
+                throw new Exception($"Failed to upload profile image: {ex.Message}. Inner: {inner}");
+            }
+        }
+
+        // UPDATE: modifies existing record
+        private async Task UpdateProfileImageAsync(Guid existingId, string base64Data, string fileName, string contentType)
+        {
+            try
+            {
+                var base64Content = base64Data.Contains(",") ? base64Data.Split(',')[1] : base64Data;
+                var fileBytes = Convert.FromBase64String(base64Content);
+                var fileExtension = GetFileExtension(contentType, fileName);
+
+                var appBinary = await _appContext.TblAppbinaries.FirstOrDefaultAsync(b => b.Id == existingId);
+                if (appBinary == null)
+                    throw new Exception("Existing profile image record not found.");
+
+                var safeFileName = (fileName ?? $"profile_image_{DateTime.UtcNow:yyyyMMddHHmmss}{fileExtension}");
+                appBinary.FileName = safeFileName.Substring(0, Math.Min(255, safeFileName.Length));
+                appBinary.Byte = fileBytes;
+                appBinary.DateUpload = DateTime.UtcNow;
+                appBinary.IsDeleted = false;
+                appBinary.Description = "User Profile Image".Substring(0, Math.Min(500, "User Profile Image".Length));
+            }
+            catch (Exception ex)
+            {
+                var inner = ex.InnerException?.Message ?? "No inner exception";
+                throw new Exception($"Failed to update profile image: {ex.Message}. Inner: {inner}");
+            }
+        }
+
+
+        private string GetFileExtension(string contentType, string fileName)
+        {
+            // Try to get extension from content type first
+            if (!string.IsNullOrEmpty(contentType))
+            {
+                return contentType.ToLower() switch
+                {
+                    "image/jpeg" or "image/jpg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/gif" => ".gif",
+                    "image/webp" => ".webp",
+                    "image/bmp" => ".bmp",
+                    _ => ""
+                };
+            }
+
+            // Fallback to filename extension
+            if (!string.IsNullOrEmpty(fileName) && fileName.Contains('.'))
+            {
+                return Path.GetExtension(fileName).ToLower();
+            }
+
+            // Default to .jpg if nothing else works
+            return ".jpg";
+        }
+
+        private async Task SoftDeleteBinaryAsync(Guid id)
+        {
+            var appBinary = await _appContext.TblAppbinaries.FirstOrDefaultAsync(b => b.Id == id);
+            if (appBinary != null)
+            {
+                appBinary.IsDeleted = true; // Soft delete flag your model already uses
+                                            // Optionally: appBinary.DateUpload = DateTime.UtcNow; // if you track change time here
+            }
         }
     }
 }

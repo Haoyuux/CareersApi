@@ -1,10 +1,12 @@
 ﻿using BrigadaCareersV3Library.ApiResponseMessage;
+using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.AuthServices;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using static BrigadaCareersV3Library.AuthServices.UserAuthenticationService;
 
 namespace BrigadaCareersV3.Controllers
 {
@@ -118,10 +120,30 @@ namespace BrigadaCareersV3.Controllers
 
         [Authorize]
         [HttpGet("getUserProfileDetails")]
-        public async Task<ActionResult<ApiResponseMessage<getUserProfileDetailsDto>>> getUserProfileDetails()
+        public async Task<ActionResult<ApiResponseMessage<UserDto>>> getUserProfileDetails()
         {
             var result = await _userAuthentication.getUserProfileDetails();
             return Ok(result);
         }
+
+        [HttpPost("InsertOrUpdateUserProfile")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> InsertOrUpdateUserProfile([FromBody] InsertOrUpdateUserProfileDto input)
+        {
+            try
+            {
+                var result = await _userAuthentication.InsertOrUpdateUserProfile(input);
+                return Ok(result); 
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
     }
 }

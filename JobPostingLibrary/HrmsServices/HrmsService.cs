@@ -99,27 +99,100 @@ namespace JobPostingLibrary.HrmsServices
 
             }
         }
+        private string GetBusinessUnitInitials(string businessUnitName)
+        {
+            // Handle null, empty, or whitespace-only strings
+            if (string.IsNullOrWhiteSpace(businessUnitName))
+                return string.Empty;
+
+            try
+            {
+                var words = businessUnitName.Split(new char[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries);
+                var initials = string.Join("", words.Select(word => 
+                    word.Length > 0 ? word[0].ToString().ToUpper() : string.Empty));
+
+                return initials;
+            }
+            catch
+            {
+                // Return empty string if any error occurs during processing
+                return string.Empty;
+            }
+        }
+        public async Task<ApiResponseMessage<IList<GetAllGenderDto>>> GetAllGender()
+        {
+            try
+            {
+                var _data = await _dbContext.Hr201genders.Select(x => new GetAllGenderDto
+                {
 
 
-private string GetBusinessUnitInitials(string businessUnitName)
-{
-    // Handle null, empty, or whitespace-only strings
-    if (string.IsNullOrWhiteSpace(businessUnitName))
-        return string.Empty;
+                    Id = x.Id,
+                    Name = x.Name,
 
-    try
-    {
-        var words = businessUnitName.Split(new char[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries);
-        var initials = string.Join("", words.Select(word => 
-            word.Length > 0 ? word[0].ToString().ToUpper() : string.Empty));
 
-        return initials;
-    }
-    catch
-    {
-        // Return empty string if any error occurs during processing
-        return string.Empty;
-    }
-}
+                }).ToListAsync();
+
+                var result = new ApiResponseMessage<IList<GetAllGenderDto>>
+                {
+                    Data = _data,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+                return result;
+            }
+            catch (Exception ex)
+            {
+                var result = new ApiResponseMessage<IList<GetAllGenderDto>>
+                {
+                    Data = [],
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException.Message
+
+                };
+                return result;
+
+            }
+        }
+        public async Task<ApiResponseMessage<IList<GetAllCivilStatusDto>>> GetAllCivilStatus()
+        {
+            try
+            {
+                var _data = await _dbContext.Hr201civilStatuses.Select(x => new GetAllCivilStatusDto
+                {
+
+
+                    Id = x.Id,
+                    Name = x.Name,
+
+
+                }).ToListAsync();
+
+
+
+
+                var result = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                {
+                    Data = _data,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+
+
+                };
+                return result;
+            }
+            catch (Exception ex)
+            {
+                var result = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                {
+                    Data = [],
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException.Message
+
+                };
+                return result;
+
+            }
+        }
     }
 }

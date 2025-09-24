@@ -44,6 +44,46 @@ namespace BrigadaCareersV3.Controllers
 
         }
 
+        [HttpGet("GetAllGender")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetAllGenderDto>>>> GetAllGender()
+        {
+            try
+            {
+                var res = await _hrmsService.GetAllGender();
+                return res;
+            }
+            catch (Exception ex)
+            {
+                var res = new ApiResponseMessage<IList<GetAllGenderDto>>
+                {
+                    Data = [],
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException.Message
+                };
+                return res;
+            }
 
+        }
+
+        [HttpGet("GetAllCivilStatus")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetAllCivilStatusDto>>>> GetAllCivilStatus()
+        {
+            try
+            {
+                var res = await _hrmsService.GetAllCivilStatus();
+                return res;
+            }
+            catch (Exception ex)
+            {
+                var res = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                {
+                    Data = [],
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException.Message
+                };
+                return res;
+            }
+
+        }
     }
 }
