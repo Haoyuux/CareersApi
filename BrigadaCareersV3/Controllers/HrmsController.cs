@@ -18,7 +18,7 @@ namespace BrigadaCareersV3.Controllers
         }
 
         [HttpGet("GetAllJobPosts")]
-        public async Task<ActionResult<ApiResponseMessage<IList<GetAllJobPostsDto>>>> GetAllJobPosts()
+        public async Task<ActionResult<ApiResponseMessageHrms<IList<GetAllJobPostsDto>>>> GetAllJobPosts()
         {
             var res = await _hrmsService.GetAllJobPosts();
             if (res is not null)
@@ -45,7 +45,7 @@ namespace BrigadaCareersV3.Controllers
         }
 
         [HttpGet("GetAllGender")]
-        public async Task<ActionResult<ApiResponseMessage<IList<GetAllGenderDto>>>> GetAllGender()
+        public async Task<ActionResult<ApiResponseMessageHrms<IList<GetAllGenderDto>>>> GetAllGender()
         {
             try
             {
@@ -54,7 +54,7 @@ namespace BrigadaCareersV3.Controllers
             }
             catch (Exception ex)
             {
-                var res = new ApiResponseMessage<IList<GetAllGenderDto>>
+                var res = new ApiResponseMessageHrms<IList<GetAllGenderDto>>
                 {
                     Data = [],
                     IsSuccess = false,
@@ -66,7 +66,7 @@ namespace BrigadaCareersV3.Controllers
         }
 
         [HttpGet("GetAllCivilStatus")]
-        public async Task<ActionResult<ApiResponseMessage<IList<GetAllCivilStatusDto>>>> GetAllCivilStatus()
+        public async Task<ActionResult<ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>>> GetAllCivilStatus()
         {
             try
             {
@@ -75,7 +75,7 @@ namespace BrigadaCareersV3.Controllers
             }
             catch (Exception ex)
             {
-                var res = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                var res = new ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>
                 {
                     Data = [],
                     IsSuccess = false,

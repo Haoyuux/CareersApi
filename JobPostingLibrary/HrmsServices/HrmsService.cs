@@ -1,6 +1,4 @@
-﻿using BrigadaCareersV3Library.ApiResponseMessage;
-using BrigadaCareersV3Library.Entities;
-using JobPostingLibrary.Entities;
+﻿using JobPostingLibrary.Entities;
 using JobPostingLibrary.HrmsDtos;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -14,15 +12,15 @@ namespace JobPostingLibrary.HrmsServices
     public class HrmsService : IHrmsService
     {
         private readonly PreProdHrmsParallelContext _dbContext;
-        private readonly BrigadaCareersDbv3Context _context;
-        public HrmsService(PreProdHrmsParallelContext dbContext, BrigadaCareersDbv3Context context)
+        //private readonly BrigadaCareersDbv3Context _context;
+        public HrmsService(PreProdHrmsParallelContext dbContext)
         {
             _dbContext = dbContext;
-            _context = context;
+       
         }
 
 
-        public async Task<ApiResponseMessage<IList<GetAllJobPostsDto>>> GetAllJobPosts()
+        public async Task<ApiResponseMessageHrms<IList<GetAllJobPostsDto>>> GetAllJobPosts()
         {
             try
             {
@@ -68,7 +66,7 @@ namespace JobPostingLibrary.HrmsServices
 
                 if (_result is null)
                 {
-                    return new ApiResponseMessage<IList<GetAllJobPostsDto>>
+                    return new ApiResponseMessageHrms<IList<GetAllJobPostsDto>>
                     {
                         Data = _result!,
                         IsSuccess = false,
@@ -78,7 +76,7 @@ namespace JobPostingLibrary.HrmsServices
                 }
 
 
-                return new ApiResponseMessage<IList<GetAllJobPostsDto>>
+                return new ApiResponseMessageHrms<IList<GetAllJobPostsDto>>
                 {
                     Data = _result,
                     IsSuccess = true,
@@ -88,7 +86,7 @@ namespace JobPostingLibrary.HrmsServices
             }
             catch (Exception ex)
             {
-                return new ApiResponseMessage<IList<GetAllJobPostsDto>>
+                return new ApiResponseMessageHrms<IList<GetAllJobPostsDto>>
                 {
                     Data = [],
                     IsSuccess = false,
@@ -119,7 +117,7 @@ namespace JobPostingLibrary.HrmsServices
                 return string.Empty;
             }
         }
-        public async Task<ApiResponseMessage<IList<GetAllGenderDto>>> GetAllGender()
+        public async Task<ApiResponseMessageHrms<IList<GetAllGenderDto>>> GetAllGender()
         {
             try
             {
@@ -133,7 +131,7 @@ namespace JobPostingLibrary.HrmsServices
 
                 }).ToListAsync();
 
-                var result = new ApiResponseMessage<IList<GetAllGenderDto>>
+                var result = new ApiResponseMessageHrms<IList<GetAllGenderDto>>
                 {
                     Data = _data,
                     IsSuccess = true,
@@ -143,7 +141,7 @@ namespace JobPostingLibrary.HrmsServices
             }
             catch (Exception ex)
             {
-                var result = new ApiResponseMessage<IList<GetAllGenderDto>>
+                var result = new ApiResponseMessageHrms<IList<GetAllGenderDto>>
                 {
                     Data = [],
                     IsSuccess = false,
@@ -154,7 +152,7 @@ namespace JobPostingLibrary.HrmsServices
 
             }
         }
-        public async Task<ApiResponseMessage<IList<GetAllCivilStatusDto>>> GetAllCivilStatus()
+        public async Task<ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>> GetAllCivilStatus()
         {
             try
             {
@@ -171,7 +169,7 @@ namespace JobPostingLibrary.HrmsServices
 
 
 
-                var result = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                var result = new ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>
                 {
                     Data = _data,
                     IsSuccess = true,
@@ -183,7 +181,7 @@ namespace JobPostingLibrary.HrmsServices
             }
             catch (Exception ex)
             {
-                var result = new ApiResponseMessage<IList<GetAllCivilStatusDto>>
+                var result = new ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>
                 {
                     Data = [],
                     IsSuccess = false,

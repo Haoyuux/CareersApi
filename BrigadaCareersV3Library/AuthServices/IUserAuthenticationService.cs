@@ -13,7 +13,6 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<string> RegisteredAdmin(RegisterUserDto register);
         Task<ApiResponseMessage<UserLoginDto>> LoginAccount(RegisterUserDto login);
         Task<ApiResponseMessage<UserDto>> getUserProfileDetails();
-        string GetCurrentUserId();
 
         // NEW: Refresh token methods
         Task<ApiResponseMessage<UserLoginDto>> RefreshTokenAsync(string refreshToken);

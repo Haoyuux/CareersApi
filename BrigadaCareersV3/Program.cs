@@ -105,6 +105,19 @@ builder.Services.AddOpenApiDocument(config =>
 
 });
 
+builder.Services.AddHttpClient("nominatim", client =>
+{
+    client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+    client.DefaultRequestHeaders.UserAgent
+          .ParseAdd("BrigadaCareers/1.0 (mercadoblaise@gmail.com)");
+});
+
+// (optional, for Angular on 4200)
+builder.Services.AddCors(o => o.AddPolicy("front", p => p
+    .WithOrigins("https://localhost:44381", "https://localhost:44381")
+    .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+));
+
 var app = builder.Build();
 
 

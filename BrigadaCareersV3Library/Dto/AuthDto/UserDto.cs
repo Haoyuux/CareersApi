@@ -19,7 +19,9 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
 
         public DateTime? DateOfBirth { get; set; }
         public Guid? Hr201GenderId { get; set; }
-        public Guid? Hr201CivilStatus { get; set; }
+        public Guid? Hr201CivilStatusId { get; set; }
+        public string Gender { get; set; }
+        public string CivilStatus { get; set; }
         public string? Address { get; set; }
         public string? AboutMe { get; set; }
         public string? StreetDetails { get; set; }

@@ -3,6 +3,7 @@ using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
 using BrigadaCareersV3Library.Entities;
+using JobPostingLibrary.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -21,9 +22,8 @@ namespace BrigadaCareersV3Library.AuthServices
         private readonly IConfiguration _configuration;
         private readonly BrigadaCareersDbv3Context _appContext;
         private readonly IHttpContextAccessor _httpContextAccessor;
-
-        // 🔑 Inject the Identity DB so we can query AspNetUserTokens directly
         private readonly ApplicationDbContext _identityDb;
+        private readonly PreProdHrmsParallelContext _dbContext;
 
         private const string RefreshLoginProvider = "userIdentity";
         private const string RefreshTokenName = "refresh_token";
@@ -34,7 +34,8 @@ namespace BrigadaCareersV3Library.AuthServices
             IConfiguration configuration,
             BrigadaCareersDbv3Context appContext,
             IHttpContextAccessor httpContextAccessor,
-            ApplicationDbContext identityDb)
+            ApplicationDbContext identityDb,
+            PreProdHrmsParallelContext dbContext)
         {
             _userManager = userManager;
             _roleManager = roleManager;
@@ -42,6 +43,7 @@ namespace BrigadaCareersV3Library.AuthServices
             _appContext = appContext;
             _httpContextAccessor = httpContextAccessor;
             _identityDb = identityDb;
+            _dbContext = dbContext;
         }
 
         public async Task<string> RegisteredUser(UserDto register)
@@ -116,7 +118,11 @@ namespace BrigadaCareersV3Library.AuthServices
                 getDetails.MiddleName = register.MiddleName;
                 getDetails.ContactNo = register.ContactNo;
                 getDetails.DateOfBirth = register.DateOfBirth;
-
+                getDetails.Hr201GenderId = register.Hr201GenderId;
+                getDetails.Hr201CivilStatus = register.Hr201CivilStatusId;
+                getDetails.Address = register.Address;
+                getDetails.StreetDetails = register.StreetDetails;
+                getDetails.AboutMe = register.AboutMe;
             }
             else 
             {
@@ -382,20 +388,24 @@ namespace BrigadaCareersV3Library.AuthServices
         {
             try
             {
-                var currentUserId = GetCurrentUserId();
+                var currentUserId = await GetCurrentUserIdAsync();
+
+                // Get user and details first
+                var user = await _appContext.AspNetUsers
+                    .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+                if (user == null)
+                {
+                    return new ApiResponseMessage<UserDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "User not found"
+                    };
+                }
 
                 var userDetails = await _appContext.TblUserDetails
-                    .FirstOrDefaultAsync(u => u.UserId == Guid.Parse(currentUserId));
-
-                var result = await
-                    (from u in _appContext.AspNetUsers
-                     join d in _appContext.TblUserDetails on u.Id equals d.UserId.ToString()
-                     join a in _appContext.TblAppbinaries on d.UserProfileImageId equals a.Id into appbinaryJoin
-                     from appbinary in appbinaryJoin.DefaultIfEmpty() 
-                     where u.Id == currentUserId
-                     select new { User = u, Details = d, AppBinary = appbinary })
-                    .FirstOrDefaultAsync();
-
+                    .FirstOrDefaultAsync(d => d.UserId.ToString() == currentUserId);
 
                 if (userDetails == null)
                 {
@@ -403,38 +413,65 @@ namespace BrigadaCareersV3Library.AuthServices
                     {
                         Data = null,
                         IsSuccess = false,
-                        ErrorMessage = "User profile details not found"
+                        ErrorMessage = "User details not found"
                     };
                 }
 
+                var appBinary = userDetails.UserProfileImageId.HasValue
+                    ? await _appContext.TblAppbinaries
+                        .FirstOrDefaultAsync(a => a.Id == userDetails.UserProfileImageId.Value)
+                    : null;
+
+                //var getgends = await _dbContext.Hr201genders.ToListAsync();
+
+                var gender = userDetails.Hr201GenderId.HasValue
+                    ? await _dbContext.Hr201genders
+                        .FirstOrDefaultAsync(g => g.Id == userDetails.Hr201GenderId.Value)
+                    : null;
+
+                var civilStatus = userDetails.Hr201CivilStatus.HasValue
+                    ? await _dbContext.Hr201civilStatuses
+                        .FirstOrDefaultAsync(cs => cs.Id == userDetails.Hr201CivilStatus.Value)
+                    : null;
+
                 var getDetails = new UserDto
                 {
-                    Id = Guid.Parse(result.User.Id),
-                    FirstName = result.Details.FirstName,
-                    LastName = result.Details.LastName,
-                    Email = result.User.Email,
-                    MiddleName = result.Details.MiddleName,
-                    ContactNo = result.Details.ContactNo,
-                    UserProfileByte = result.AppBinary != null ? result.AppBinary.Byte : null
-
-
+                    Id = Guid.Parse(user.Id),
+                    FirstName = userDetails.FirstName,
+                    LastName = userDetails.LastName,
+                    Email = user.Email,
+                    MiddleName = userDetails.MiddleName,
+                    ContactNo = userDetails.ContactNo,
+                    UserProfileByte = appBinary?.Byte,
+                    Hr201GenderId = userDetails.Hr201GenderId,
+                    Hr201CivilStatusId = userDetails.Hr201CivilStatus,
+                    Gender = gender?.Name,
+                    CivilStatus = civilStatus?.Name,
+                    DateOfBirth = userDetails.DateOfBirth,
+                    Address = userDetails.Address,
+                    StreetDetails = userDetails.StreetDetails,
+                    AboutMe = userDetails.AboutMe,
                 };
-                
 
-              
-                return new ApiResponseMessage<UserDto> 
-                { 
-                   Data = getDetails, 
-                   IsSuccess = true, 
-                   ErrorMessage = ""
+                return new ApiResponseMessage<UserDto>
+                {
+                    Data = getDetails,
+                    IsSuccess = true,
+                    ErrorMessage = ""
                 };
             }
             catch (Exception ex)
             {
-                return new ApiResponseMessage<UserDto> { Data = null, IsSuccess = false, ErrorMessage = ex.Message };
+                return new ApiResponseMessage<UserDto>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
             }
         }
-        public string GetCurrentUserId()
+
+        public async Task<string> GetCurrentUserIdAsync()
         {
             var httpContext = _httpContextAccessor.HttpContext
                 ?? throw new InvalidOperationException("No HttpContext. User is not authenticated.");
@@ -443,8 +480,8 @@ namespace BrigadaCareersV3Library.AuthServices
 
             string[] idClaimTypes =
             {
-                ClaimTypes.NameIdentifier, JwtRegisteredClaimNames.Sub, "sub", "oid", "uid", "userid", "user_id", "id", "nameid"
-            };
+        ClaimTypes.NameIdentifier, JwtRegisteredClaimNames.Sub, "sub", "oid", "uid", "userid", "user_id", "id", "nameid"
+    };
 
             var userId = idClaimTypes
                 .Select(t => user.FindFirstValue(t))
@@ -456,14 +493,13 @@ namespace BrigadaCareersV3Library.AuthServices
                 throw new InvalidOperationException("User ID claim is missing from the authentication token. Available claims: " + available);
             }
 
-            var identityUser = _userManager.FindByIdAsync(userId);
+            var identityUser = await _userManager.FindByIdAsync(userId);
             if (identityUser == null)
-            {
                 throw new Exception("User not found in identity system");
-            }
 
-            return userId;
+            return userId; // keep as string
         }
+
 
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
         {
@@ -471,7 +507,8 @@ namespace BrigadaCareersV3Library.AuthServices
 
             try
             {
-                var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                var currentUserId = await GetCurrentUserIdAsync();
                 var userGuid = Guid.Parse(currentUserId);
 
                 var userDetails = await _appContext.TblUserDetails
@@ -551,9 +588,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
-
-
-
         // CREATE: returns new Guid
         private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType)
         {

@@ -29,14 +29,6 @@ public partial class TblUserDetail
 
     public string? Address { get; set; }
 
-    public string? Region { get; set; }
-
-    public string? Province { get; set; }
-
-    public string? City { get; set; }
-
-    public string? Barangay { get; set; }
-
     public string? AboutMe { get; set; }
 
     public string? StreetDetails { get; set; }

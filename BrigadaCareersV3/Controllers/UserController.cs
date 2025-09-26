@@ -6,7 +6,9 @@ using BrigadaCareersV3Library.Dto.UserDto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 using static BrigadaCareersV3Library.AuthServices.UserAuthenticationService;
+using static System.Net.WebRequestMethods;
 
 namespace BrigadaCareersV3.Controllers
 {
@@ -15,13 +17,17 @@ namespace BrigadaCareersV3.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserAuthenticationService _userAuthentication;
+        private readonly HttpClient _http;
+        private readonly IHttpClientFactory _httpFactory;
 
-        public UserController(IUserAuthenticationService userAuthentication)
+        public UserController(IUserAuthenticationService userAuthentication, HttpClient http, IHttpClientFactory httpFactory)
         {
             _userAuthentication = userAuthentication;
+            _http = http;
+            _httpFactory = httpFactory;
         }
 
-        
+
         private static CookieOptions BuildRefreshCookieOptions() => new CookieOptions
         {
             HttpOnly = true,
@@ -144,6 +150,31 @@ namespace BrigadaCareersV3.Controllers
                 });
             }
         }
+
+        public record NominatimResult(
+            [property: JsonPropertyName("place_id")] long PlaceId,
+            [property: JsonPropertyName("display_name")] string DisplayName,
+            [property: JsonPropertyName("lat")] string Lat,
+            [property: JsonPropertyName("lon")] string Lon,
+            [property: JsonPropertyName("address")] Dictionary<string, string>? Address
+        );
+
+
+        [HttpGet("search")]
+        [AllowAnonymous]
+        [Produces("application/json")]
+        [ProducesResponseType(typeof(List<NominatimResult>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<NominatimResult>>> Search([FromQuery] string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return BadRequest("q is required.");
+
+            var http = _httpFactory.CreateClient("nominatim");
+            var url = $"search?format=jsonv2&addressdetails=1&limit=10&accept-language=en&q={Uri.EscapeDataString(q)}";
+
+            var results = await http.GetFromJsonAsync<List<NominatimResult>>(url);
+            return Ok(results ?? new List<NominatimResult>());
+        }
+
 
     }
 }
