@@ -176,5 +176,30 @@ namespace BrigadaCareersV3.Controllers
         }
 
 
+        [Authorize]
+        [HttpPost("CreateOrEditEducation")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditEducation(CreateOrEditEducationDto input)
+        {
+            var result = await _userAuthentication.CreateOrEditEducation(input);
+            if (result != null) 
+            {
+                return Ok(result);
+            }
+           return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpGet("CreateOrEditEducation")]
+        public async Task<ActionResult<ApiResponseMessage<IList<CreateOrEditEducationDto>>>> GetUserEducation()
+        {
+            var result = await _userAuthentication.GetUserEducation();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+
     }
 }

@@ -9,6 +9,8 @@ public partial class TblEducation
 
     public Guid UserIdFk { get; set; }
 
+    public string SchoolName { get; set; } = null!;
+
     public string EducationLevel { get; set; } = null!;
 
     public string Course { get; set; } = null!;

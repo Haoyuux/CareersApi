@@ -174,6 +174,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.EducationLevel).IsUnicode(false);
             entity.Property(e => e.EndDate).HasColumnType("datetime");
             entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.SchoolName).IsUnicode(false);
             entity.Property(e => e.StartDate).HasColumnType("datetime");
 
             entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblEducations)

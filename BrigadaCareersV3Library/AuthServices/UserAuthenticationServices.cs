@@ -685,5 +685,67 @@ namespace BrigadaCareersV3Library.AuthServices
                                             // Optionally: appBinary.DateUpload = DateTime.UtcNow; // if you track change time here
             }
         }
+
+
+
+        public async Task<ApiResponseMessage<string>> CreateOrEditEducation(CreateOrEditEducationDto input)
+        {
+            if (input.Id == Guid.Empty)
+            {
+                //create
+                var insertEdu = new TblEducation
+                {
+                    Id = Guid.NewGuid(),
+                    SchoolName = input.SchoolName,
+                    EducationLevel = input.EducationLevel,
+                    Course = input.Course,
+                    StartDate = input.StartDate,
+                    EndDate = input.EndDate,
+                    CreationTime = DateTime.UtcNow,
+                    IsDeleted = false
+                };
+
+                await _appContext.TblEducations.AddAsync(insertEdu);
+                await _appContext.SaveChangesAsync();
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = "Success",
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+
+            }
+            else 
+            {
+                //update
+            }
+            return null;
+        }
+
+        public async Task<ApiResponseMessage<IList<CreateOrEditEducationDto>>> GetUserEducation()
+        {
+            var currentUserId = await GetCurrentUserIdAsync();
+            var userGuid = Guid.Parse(currentUserId);
+
+            var getUserEducation = await _appContext.TblEducations.Where(x => x.UserIdFk == userGuid)
+                .Select(x => new CreateOrEditEducationDto
+                { 
+                SchoolName = x.SchoolName,
+                EducationLevel = x.EducationLevel,
+                Course = x.Course,
+                StartDate = x.StartDate,
+                EndDate = x.EndDate,
+                })
+                .ToListAsync();
+
+            return new ApiResponseMessage<IList<CreateOrEditEducationDto>>
+            {
+                Data = getUserEducation,
+                IsSuccess = true,
+                ErrorMessage = "",
+            };
+        }
+
     }
 }
