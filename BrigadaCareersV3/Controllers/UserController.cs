@@ -178,21 +178,38 @@ namespace BrigadaCareersV3.Controllers
 
         [Authorize]
         [HttpPost("CreateOrEditEducation")]
-        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditEducation(CreateOrEditEducationDto input)
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditEducation([FromBody] CreateOrEditEducationDto input)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState); // This will show validation errors
+            }
+
             var result = await _userAuthentication.CreateOrEditEducation(input);
-            if (result != null) 
+            if (result != null)
             {
                 return Ok(result);
             }
-           return BadRequest(result);
+            return BadRequest(result);
         }
 
         [Authorize]
-        [HttpGet("CreateOrEditEducation")]
+        [HttpGet("GetUserEducation")]
         public async Task<ActionResult<ApiResponseMessage<IList<CreateOrEditEducationDto>>>> GetUserEducation()
         {
             var result = await _userAuthentication.GetUserEducation();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpDelete("DeleteUserEducation")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserEducation(Guid educationId)
+        {
+            var result = await _userAuthentication.DeleteUserEducation(educationId);
             if (result != null)
             {
                 return Ok(result);

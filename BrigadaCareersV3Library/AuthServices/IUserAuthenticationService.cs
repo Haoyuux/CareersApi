@@ -21,5 +21,6 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input);
         Task<ApiResponseMessage<string>> CreateOrEditEducation(CreateOrEditEducationDto input);
         Task<ApiResponseMessage<IList<CreateOrEditEducationDto>>> GetUserEducation();
+        Task<ApiResponseMessage<string>> DeleteUserEducation(Guid educationId);
     }
 }

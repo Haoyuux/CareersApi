@@ -388,11 +388,11 @@ namespace BrigadaCareersV3Library.AuthServices
         {
             try
             {
-                var currentUserId = await GetCurrentUserIdAsync();
+                var currentUser = await GetCurrentUserIdAsync();
 
                 // Get user and details first
                 var user = await _appContext.AspNetUsers
-                    .FirstOrDefaultAsync(u => u.Id == currentUserId);
+                    .FirstOrDefaultAsync(u => u.Id == currentUser.UserId.ToString());
 
                 if (user == null)
                 {
@@ -405,7 +405,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 }
 
                 var userDetails = await _appContext.TblUserDetails
-                    .FirstOrDefaultAsync(d => d.UserId.ToString() == currentUserId);
+                    .FirstOrDefaultAsync(d => d.UserId.ToString() == currentUser.UserId.ToString());
 
                 if (userDetails == null)
                 {
@@ -471,11 +471,19 @@ namespace BrigadaCareersV3Library.AuthServices
             }
         }
 
-        public async Task<string> GetCurrentUserIdAsync()
+        public class GetCurrentUserIdAsyncDto
+        {
+            public Guid Id { get; set; }
+            public Guid UserId { get; set; }
+            public string FirstName { get; set; }
+            public string MiddleName { get; set; }
+            public string LastName { get; set; }
+        };
+
+        public async Task<GetCurrentUserIdAsyncDto> GetCurrentUserIdAsync()
         {
             var httpContext = _httpContextAccessor.HttpContext
                 ?? throw new InvalidOperationException("No HttpContext. User is not authenticated.");
-
             var user = httpContext.User ?? throw new InvalidOperationException("No User principal on HttpContext.");
 
             string[] idClaimTypes =
@@ -497,7 +505,27 @@ namespace BrigadaCareersV3Library.AuthServices
             if (identityUser == null)
                 throw new Exception("User not found in identity system");
 
-            return userId; // keep as string
+            // Parse BEFORE the query - this is the key fix
+            var userGuid = Guid.Parse(userId);
+
+            // Now use the parsed Guid in the query
+            var joinUserDetails = await
+                (
+                from userdetails in _appContext.TblUserDetails
+                where userdetails.UserId == userGuid 
+                select new GetCurrentUserIdAsyncDto
+                {
+                    Id = userdetails.Id,
+                    UserId = userdetails.UserId,
+                    FirstName = userdetails.FirstName!,
+                    LastName = userdetails.LastName!,
+                }
+                ).FirstOrDefaultAsync();
+
+            if (joinUserDetails == null)
+                throw new Exception("User details not found");
+
+            return joinUserDetails;
         }
 
 
@@ -508,11 +536,11 @@ namespace BrigadaCareersV3Library.AuthServices
             try
             {
                 //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
-                var currentUserId = await GetCurrentUserIdAsync();
-                var userGuid = Guid.Parse(currentUserId);
+                var currentUser = await GetCurrentUserIdAsync();
+   
 
                 var userDetails = await _appContext.TblUserDetails
-                    .FirstOrDefaultAsync(u => u.UserId == userGuid);
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
 
                 if (userDetails == null)
                 {
@@ -693,27 +721,46 @@ namespace BrigadaCareersV3Library.AuthServices
             if (input.Id == Guid.Empty)
             {
                 //create
-                var insertEdu = new TblEducation
+                try
                 {
-                    Id = Guid.NewGuid(),
-                    SchoolName = input.SchoolName,
-                    EducationLevel = input.EducationLevel,
-                    Course = input.Course,
-                    StartDate = input.StartDate,
-                    EndDate = input.EndDate,
-                    CreationTime = DateTime.UtcNow,
-                    IsDeleted = false
-                };
+                    var currentUser = await GetCurrentUserIdAsync();
+             
 
-                await _appContext.TblEducations.AddAsync(insertEdu);
-                await _appContext.SaveChangesAsync();
 
-                return new ApiResponseMessage<string>
+                    var insertEdu = new TblEducation
+                    {
+                        Id = Guid.NewGuid(),
+                        UserIdFk = currentUser.Id,
+                        SchoolName = input.SchoolName,
+                        EducationLevel = input.EducationLevel,
+                        Course = input.Course,
+                        StartDate = input.StartDate,
+                        EndDate = input.EndDate,
+                        CreationTime = DateTime.UtcNow,
+                        IsDeleted = false
+                    };
+
+                    await _appContext.TblEducations.AddAsync(insertEdu);
+                    await _appContext.SaveChangesAsync();
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Success",
+                        IsSuccess = true,
+                        ErrorMessage = ""
+                    };
+                }
+                catch (Exception ex)
                 {
-                    Data = "Success",
-                    IsSuccess = true,
-                    ErrorMessage = ""
-                };
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "",
+                        IsSuccess = false,
+                        ErrorMessage = ex.Message   
+                    };
+                }
+
 
             }
             else 
@@ -725,12 +772,12 @@ namespace BrigadaCareersV3Library.AuthServices
 
         public async Task<ApiResponseMessage<IList<CreateOrEditEducationDto>>> GetUserEducation()
         {
-            var currentUserId = await GetCurrentUserIdAsync();
-            var userGuid = Guid.Parse(currentUserId);
+            var currentUser = await GetCurrentUserIdAsync();
 
-            var getUserEducation = await _appContext.TblEducations.Where(x => x.UserIdFk == userGuid)
+            var getUserEducation = await _appContext.TblEducations.Where(x => x.UserIdFk == currentUser.Id)
                 .Select(x => new CreateOrEditEducationDto
                 { 
+                Id = x.Id,
                 SchoolName = x.SchoolName,
                 EducationLevel = x.EducationLevel,
                 Course = x.Course,
@@ -745,6 +792,47 @@ namespace BrigadaCareersV3Library.AuthServices
                 IsSuccess = true,
                 ErrorMessage = "",
             };
+        }
+
+        public async Task<ApiResponseMessage<string>> DeleteUserEducation(Guid educationId)
+        {
+            try
+            {
+                var apiMessage = "";
+                var getUserEducation = await _appContext.TblEducations.Where(x => x.Id == educationId).FirstOrDefaultAsync();
+
+                if (getUserEducation is null)
+                {
+                    apiMessage = "";
+                }
+                else 
+                {
+                    _appContext.TblEducations.Remove(getUserEducation!);
+                    await _appContext.SaveChangesAsync();
+
+                    apiMessage = "Success";
+                }
+
+
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = !string.IsNullOrWhiteSpace(apiMessage),
+                    ErrorMessage = !string.IsNullOrWhiteSpace(apiMessage) ? "" : "No Data"
+                };
+            }
+            catch (Exception ex)
+            {
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = "",
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message,
+                };
+            }
+
         }
 
     }

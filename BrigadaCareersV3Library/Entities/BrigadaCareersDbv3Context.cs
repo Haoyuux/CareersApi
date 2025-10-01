@@ -151,7 +151,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblCertificates)
                 .HasForeignKey(d => d.UserIdFk)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Tbl_Certificate_Tbl_UserDetails1");
+                .HasConstraintName("FK_Tbl_Certificate_Tbl_UserDetails");
         });
 
         modelBuilder.Entity<TblCertificateType>(entity =>
@@ -232,7 +232,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblWorkExperiences)
                 .HasForeignKey(d => d.UserIdFk)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Tbl_WorkExperience_Tbl_UserDetails1");
+                .HasConstraintName("FK_Tbl_WorkExperience_Tbl_UserDetails");
         });
 
         OnModelCreatingPartial(modelBuilder);
