@@ -58,7 +58,6 @@ namespace BrigadaCareersV3Library.AuthServices
             }
             return "Success";
         }
-
         public async Task<string> CreateUser(UserDto register)
         {
             try
@@ -106,7 +105,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return ex.Message;
             }
         }
-
         public async Task UpdateUserDetails(UserDto register)
         {
 
@@ -130,11 +128,7 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
             await _appContext.SaveChangesAsync();
-          
-
-           
         }
-
         public async Task<string> RegisteredAdmin(RegisterUserDto register)
         {
             try
@@ -167,7 +161,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return ex.Message;
             }
         }
-
         public async Task<ApiResponseMessage<UserLoginDto>> LoginAccount(RegisterUserDto login)
         {
             try
@@ -207,7 +200,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return new ApiResponseMessage<UserLoginDto> { Data = null!, IsSuccess = false, ErrorMessage = ex.Message };
             }
         }
-
         public async Task<ApiResponseMessage<UserLoginDto>> RefreshTokenAsync(string refreshToken)
         {
             try
@@ -266,7 +258,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return new ApiResponseMessage<UserLoginDto> { Data = null, IsSuccess = false, ErrorMessage = ex.Message };
             }
         }
-
         public async Task<ApiResponseMessage<bool>> InvalidateRefreshTokenAsync(string refreshToken)
         {
             try
@@ -288,7 +279,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return new ApiResponseMessage<bool> { Data = false, IsSuccess = false, ErrorMessage = ex.Message };
             }
         }
-
         public async Task<ApiResponseMessage<bool>> LogoutAsync(string refreshToken)
         {
             try
@@ -311,9 +301,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return new ApiResponseMessage<bool> { Data = false, IsSuccess = false, ErrorMessage = ex.Message };
             }
         }
-
-        // === Helpers ===
-
         private async Task<string> GenerateAccessToken(ApplicationIdentityUser user, IList<string> userRoles)
         {
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:SecreteKey"]!));
@@ -470,16 +457,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
-
-        public class GetCurrentUserIdAsyncDto
-        {
-            public Guid Id { get; set; }
-            public Guid UserId { get; set; }
-            public string FirstName { get; set; }
-            public string MiddleName { get; set; }
-            public string LastName { get; set; }
-        };
-
         public async Task<GetCurrentUserIdAsyncDto> GetCurrentUserIdAsync()
         {
             var httpContext = _httpContextAccessor.HttpContext
@@ -527,8 +504,6 @@ namespace BrigadaCareersV3Library.AuthServices
 
             return joinUserDetails;
         }
-
-
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
         {
             var response = new ApiResponseMessage<string>();
@@ -616,7 +591,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
-        // CREATE: returns new Guid
         private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType)
         {
             try
@@ -649,8 +623,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 throw new Exception($"Failed to upload profile image: {ex.Message}. Inner: {inner}");
             }
         }
-
-        // UPDATE: modifies existing record
         private async Task UpdateProfileImageAsync(Guid existingId, string base64Data, string fileName, string contentType)
         {
             try
@@ -676,8 +648,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 throw new Exception($"Failed to update profile image: {ex.Message}. Inner: {inner}");
             }
         }
-
-
         private string GetFileExtension(string contentType, string fileName)
         {
             // Try to get extension from content type first
@@ -703,7 +673,6 @@ namespace BrigadaCareersV3Library.AuthServices
             // Default to .jpg if nothing else works
             return ".jpg";
         }
-
         private async Task SoftDeleteBinaryAsync(Guid id)
         {
             var appBinary = await _appContext.TblAppbinaries.FirstOrDefaultAsync(b => b.Id == id);
@@ -713,9 +682,7 @@ namespace BrigadaCareersV3Library.AuthServices
                                             // Optionally: appBinary.DateUpload = DateTime.UtcNow; // if you track change time here
             }
         }
-
-
-
+        //EDUCATION
         public async Task<ApiResponseMessage<string>> CreateOrEditEducation(CreateOrEditEducationDto input)
         {
             if (input.Id == Guid.Empty)
@@ -769,7 +736,6 @@ namespace BrigadaCareersV3Library.AuthServices
             }
             return null;
         }
-
         public async Task<ApiResponseMessage<IList<CreateOrEditEducationDto>>> GetUserEducation()
         {
             var currentUser = await GetCurrentUserIdAsync();
@@ -793,7 +759,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 ErrorMessage = "",
             };
         }
-
         public async Task<ApiResponseMessage<string>> DeleteUserEducation(Guid educationId)
         {
             try
@@ -834,6 +799,122 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
         }
+        //WORK EXPERIENCE
+        public async Task<ApiResponseMessage<string>> CreateOrEditWorkExperience(CreateOrEditWorkExperienceDto input)
+        {
+            if (input.Id == Guid.Empty)
+            {
+                //create
+                try
+                {
+                    var currentUser = await GetCurrentUserIdAsync();
+                    var insertWorkExp = new TblWorkExperience
+                    {
+                        Id = Guid.NewGuid(),
+                        UserIdFk = currentUser.Id,
+                        CreationTime = DateTime.UtcNow,
+                        IsDeleted = false,
+                        CompanyAddress = input.CompanyAddress,
+                        CompanyName = input.CompanyName,
+                        JobTitle = input.JobTitle,
+                        JobDescription = input.JobDescription,
+                        StartDate = input.StartDate,
+                        EndDate = input.EndDate,
 
+                    };
+
+                    await _appContext.TblWorkExperiences.AddAsync(insertWorkExp);
+                    await _appContext.SaveChangesAsync();
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Success",
+                        IsSuccess = true,
+                        ErrorMessage = ""
+                    };
+                }
+                catch (Exception ex)
+                {
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "",
+                        IsSuccess = false,
+                        ErrorMessage = ex.Message
+                    };
+                }
+
+
+            }
+            else
+            {
+                //update
+            }
+            return null;
+        }
+        public async Task<ApiResponseMessage<IList<CreateOrEditWorkExperienceDto>>> GetUserWorkExperience()
+        {
+            var currentUser = await GetCurrentUserIdAsync();
+
+            var getUserWorkExp = await _appContext.TblWorkExperiences.Where(x => x.UserIdFk == currentUser.Id)
+                .Select(x => new CreateOrEditWorkExperienceDto
+                {
+                    Id = x.Id,
+                    CompanyName = x.CompanyName,
+                    CompanyAddress = x.CompanyAddress,
+                    JobDescription = x.JobDescription,
+                    JobTitle = x.JobTitle,
+                    StartDate = x.StartDate,
+                    EndDate = x.EndDate,
+                })
+                .ToListAsync();
+
+            return new ApiResponseMessage<IList<CreateOrEditWorkExperienceDto>>
+            {
+                Data = getUserWorkExp,
+                IsSuccess = true,
+                ErrorMessage = "",
+            };
+        }
+        public async Task<ApiResponseMessage<string>> DeleteUserWorkExperience(Guid workexperienceId)
+        {
+            try
+            {
+                var apiMessage = "";
+                var getUserWorkExp = await _appContext.TblWorkExperiences.Where(x => x.Id == workexperienceId).FirstOrDefaultAsync();
+
+                if (getUserWorkExp is null)
+                {
+                    apiMessage = "";
+                }
+                else
+                {
+                    _appContext.TblWorkExperiences.Remove(getUserWorkExp!);
+                    await _appContext.SaveChangesAsync();
+
+                    apiMessage = "Success";
+                }
+
+
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = !string.IsNullOrWhiteSpace(apiMessage),
+                    ErrorMessage = !string.IsNullOrWhiteSpace(apiMessage) ? "" : "No Data"
+                };
+            }
+            catch (Exception ex)
+            {
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = "",
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message,
+                };
+            }
+
+        }
     }
 }

@@ -180,10 +180,7 @@ namespace BrigadaCareersV3.Controllers
         [HttpPost("CreateOrEditEducation")]
         public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditEducation([FromBody] CreateOrEditEducationDto input)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState); // This will show validation errors
-            }
+  
 
             var result = await _userAuthentication.CreateOrEditEducation(input);
             if (result != null)
@@ -217,6 +214,43 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(result);
         }
 
+        [Authorize]
+        [HttpPost("CreateOrEditWorkExperience")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditWorkExperience([FromBody] CreateOrEditWorkExperienceDto input)
+        {
+
+
+            var result = await _userAuthentication.CreateOrEditWorkExperience(input);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpGet("GetUserWorkExperience")]
+        public async Task<ActionResult<ApiResponseMessage<IList<CreateOrEditWorkExperienceDto>>>> GetUserWorkExperience()
+        {
+            var result = await _userAuthentication.GetUserWorkExperience();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpDelete("DeleteUserWorkExperience")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserWorkExperience(Guid workexperienceId)
+        {
+            var result = await _userAuthentication.DeleteUserWorkExperience(workexperienceId);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
 
     }
 }

@@ -13,14 +13,17 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<string> RegisteredAdmin(RegisterUserDto register);
         Task<ApiResponseMessage<UserLoginDto>> LoginAccount(RegisterUserDto login);
         Task<ApiResponseMessage<UserDto>> getUserProfileDetails();
-
-        // NEW: Refresh token methods
         Task<ApiResponseMessage<UserLoginDto>> RefreshTokenAsync(string refreshToken);
         Task<ApiResponseMessage<bool>> InvalidateRefreshTokenAsync(string refreshToken);
         Task<ApiResponseMessage<bool>> LogoutAsync(string refreshToken);
         Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input);
+        //EDUCATION
         Task<ApiResponseMessage<string>> CreateOrEditEducation(CreateOrEditEducationDto input);
         Task<ApiResponseMessage<IList<CreateOrEditEducationDto>>> GetUserEducation();
         Task<ApiResponseMessage<string>> DeleteUserEducation(Guid educationId);
+        //WORK EXPERIENCE
+        Task<ApiResponseMessage<string>> CreateOrEditWorkExperience(CreateOrEditWorkExperienceDto input);
+        Task<ApiResponseMessage<IList<CreateOrEditWorkExperienceDto>>> GetUserWorkExperience();
+        Task<ApiResponseMessage<string>> DeleteUserWorkExperience(Guid workexperienceId);
     }
 }

@@ -19,7 +19,7 @@ public partial class TblWorkExperience
 
     public DateTime StartDate { get; set; }
 
-    public DateTime EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
 
     public bool IsDeleted { get; set; }
 
