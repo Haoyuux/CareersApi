@@ -9,9 +9,15 @@ public partial class TblCertificate
 
     public Guid UserIdFk { get; set; }
 
-    public string Description { get; set; } = null!;
+    public string Issuer { get; set; } = null!;
+
+    public string Name { get; set; } = null!;
+
+    public string Highlights { get; set; } = null!;
 
     public DateTime DateAchieved { get; set; }
+
+    public int CertificateType { get; set; }
 
     public Guid AttachImgId { get; set; }
 
@@ -21,9 +27,7 @@ public partial class TblCertificate
 
     public DateTime CreationTime { get; set; }
 
-    public virtual TblAppbinary CertificateType { get; set; } = null!;
-
-    public virtual TblCertificateType CertificateTypeNavigation { get; set; } = null!;
+    public virtual TblAppbinary AttachImg { get; set; } = null!;
 
     public virtual TblUserDetail UserIdFkNavigation { get; set; } = null!;
 }

@@ -12,6 +12,4 @@ public partial class TblCertificateType
     public DateTime CreationTime { get; set; }
 
     public bool IsDeleted { get; set; }
-
-    public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
 }

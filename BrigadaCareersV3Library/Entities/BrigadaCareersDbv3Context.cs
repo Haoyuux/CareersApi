@@ -135,18 +135,15 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
             entity.Property(e => e.DateAchieved).HasColumnType("datetime");
-            entity.Property(e => e.Description).IsUnicode(false);
+            entity.Property(e => e.Highlights).IsUnicode(false);
             entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.Issuer).IsUnicode(false);
+            entity.Property(e => e.Name).IsUnicode(false);
 
-            entity.HasOne(d => d.CertificateType).WithMany(p => p.TblCertificates)
-                .HasForeignKey(d => d.CertificateTypeId)
+            entity.HasOne(d => d.AttachImg).WithMany(p => p.TblCertificates)
+                .HasForeignKey(d => d.AttachImgId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Tbl_Certificate_Tbl_Appbinary1");
-
-            entity.HasOne(d => d.CertificateTypeNavigation).WithMany(p => p.TblCertificates)
-                .HasForeignKey(d => d.CertificateTypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Tbl_Certificate_Tbl_CertificateType");
 
             entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblCertificates)
                 .HasForeignKey(d => d.UserIdFk)

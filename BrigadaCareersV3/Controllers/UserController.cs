@@ -252,5 +252,43 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(result);
         }
 
+        [Authorize]
+        [HttpPost("CreateOrEditCertificate")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditCertificate([FromBody] CreateOrEditCertificateDto input)
+        {
+
+
+            var result = await _userAuthentication.CreateOrEditCertificate(input);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpGet("GetUserCertificate")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetUserCertificateDto>>>> GetUserCertificate()
+        {
+            var result = await _userAuthentication.GetUserCertificate();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpDelete("DeleteUserCertificate")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserCertificate(Guid certificateId)
+        {
+            var result = await _userAuthentication.DeleteUserCertificate(certificateId);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
     }
 }

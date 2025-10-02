@@ -25,5 +25,9 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<string>> CreateOrEditWorkExperience(CreateOrEditWorkExperienceDto input);
         Task<ApiResponseMessage<IList<CreateOrEditWorkExperienceDto>>> GetUserWorkExperience();
         Task<ApiResponseMessage<string>> DeleteUserWorkExperience(Guid workexperienceId);
+        //Certificate
+        Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input);
+        Task<ApiResponseMessage<IList<GetUserCertificateDto>>> GetUserCertificate();
+        Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId);
     }
 }

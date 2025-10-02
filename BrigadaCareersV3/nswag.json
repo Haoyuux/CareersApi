@@ -19,7 +19,7 @@
       "defaultDictionaryValueReferenceTypeNullHandling": "NotNull",
       "defaultResponseReferenceTypeNullHandling": "NotNull",
       "generateOriginalParameterNames": true,
-      "defaultEnumHandling": "Integer",
+      "defaultEnumHandling": "String", 
       "flattenInheritanceHierarchy": false,
       "generateKnownTypes": true,
       "generateEnumMappingDescription": false,
@@ -42,7 +42,7 @@
       "schemaNameGeneratorType": null,
       "contractResolverType": null,
       "serializerSettingsType": null,
-      "useDocumentProvider": true,
+      "useDocumentProvider": false, 
       "documentName": "v1",
       "aspNetCoreEnvironment": null,
       "createWebHostBuilderMethod": null,
@@ -96,6 +96,8 @@
       "generateCloneMethod": false,
       "typeStyle": "Class",
       "enumStyle": "Enum",
+      "exportEnums": true, 
+      "stringEnums": true,
       "useLeafType": false,
       "classTypes": [],
       "extendedClasses": [],
@@ -123,7 +125,6 @@
       "serviceSchemes": null,
       "output": "D:/Project/Github/Careers/CareersAngular/src/app/services/nswag/service-proxie.ts",
       "newLineBehavior": "Auto"
-
     }
   }
 }

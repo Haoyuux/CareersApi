@@ -1,6 +1,7 @@
 ﻿using BrigadaCareersV3Library.ApiResponseMessage;
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
+using BrigadaCareersV3Library.Dto.Enums;
 using BrigadaCareersV3Library.Dto.UserDto;
 using BrigadaCareersV3Library.Entities;
 using JobPostingLibrary.Entities;
@@ -557,7 +558,9 @@ namespace BrigadaCareersV3Library.AuthServices
                         var newId = await UploadNewProfileImageAsync(
                             input.ProfileImageBase64,
                             input.ProfileImageFileName,
-                            input.ProfileImageContentType);
+                            input.ProfileImageContentType,
+                            "User Profile Image"
+                            );
 
                         userDetails.UserProfileImageId = newId;
                         response.Data = "Inserted";
@@ -568,7 +571,10 @@ namespace BrigadaCareersV3Library.AuthServices
                             userDetails.UserProfileImageId.Value,
                             input.ProfileImageBase64,
                             input.ProfileImageFileName,
-                            input.ProfileImageContentType);
+                            input.ProfileImageContentType,
+                            "User Profile Image"
+
+                            );
 
                         response.Data = input.RemoveProfileImage ? "Replaced" : "Updated";
                     }
@@ -591,7 +597,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
-        private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType)
+        private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType, string description)
         {
             try
             {
@@ -608,7 +614,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     Byte = fileBytes,
                     DateUpload = DateTime.UtcNow,
                     IsDeleted = false,
-                    Description = "User Profile Image".Substring(0, Math.Min(500, "User Profile Image".Length)),
+                    Description = description.Substring(0, Math.Min(500, description.Length)),
                     CreationTime = DateTime.UtcNow
                 };
 
@@ -623,7 +629,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 throw new Exception($"Failed to upload profile image: {ex.Message}. Inner: {inner}");
             }
         }
-        private async Task UpdateProfileImageAsync(Guid existingId, string base64Data, string fileName, string contentType)
+        private async Task UpdateProfileImageAsync(Guid existingId, string base64Data, string fileName, string contentType, string description)
         {
             try
             {
@@ -640,7 +646,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 appBinary.Byte = fileBytes;
                 appBinary.DateUpload = DateTime.UtcNow;
                 appBinary.IsDeleted = false;
-                appBinary.Description = "User Profile Image".Substring(0, Math.Min(500, "User Profile Image".Length));
+                appBinary.Description = description.Substring(0, Math.Min(500, description.Length));
             }
             catch (Exception ex)
             {
@@ -660,6 +666,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     "image/gif" => ".gif",
                     "image/webp" => ".webp",
                     "image/bmp" => ".bmp",
+                    "application/pdf" => ".pdf",
                     _ => ""
                 };
             }
@@ -673,6 +680,7 @@ namespace BrigadaCareersV3Library.AuthServices
             // Default to .jpg if nothing else works
             return ".jpg";
         }
+
         private async Task SoftDeleteBinaryAsync(Guid id)
         {
             var appBinary = await _appContext.TblAppbinaries.FirstOrDefaultAsync(b => b.Id == id);
@@ -916,5 +924,134 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
         }
+        //CERTIFICATE
+        public async Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input)
+        {
+            if (input.Id == Guid.Empty)
+            {
+                //create
+                try
+                {
+                    var currentUser = await GetCurrentUserIdAsync();
+                    var insertCert = new TblCertificate
+                    {
+                        Id = Guid.NewGuid(),
+                        UserIdFk = currentUser.Id,
+                        CreationTime = DateTime.UtcNow,
+                        IsDeleted = false,
+                        Name = input.Name,
+                        Issuer = input.Issuer,
+                        Highlights = input.Highlights,
+                        DateAchieved = input.DateAchieved,
+                        CertificateType = input.CertificateType,
+                        AttachImgId = await UploadNewProfileImageAsync(
+                            input.ProfileImageBase64,
+                            input.ProfileImageFileName,
+                            input.ProfileImageContentType,
+                            "User Upload Certificate"
+                            )
+
+                };
+
+                    await _appContext.TblCertificates.AddAsync(insertCert);
+                    await _appContext.SaveChangesAsync();
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Success",
+                        IsSuccess = true,
+                        ErrorMessage = ""
+                    };
+                }
+                catch (Exception ex)
+                {
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "",
+                        IsSuccess = false,
+                        ErrorMessage = ex.Message
+                    };
+                }
+
+
+            }
+            else
+            {
+                //update
+            }
+            return null;
+        }
+        public async Task<ApiResponseMessage<IList<GetUserCertificateDto>>> GetUserCertificate()
+        {
+            var currentUser = await GetCurrentUserIdAsync();
+
+
+            var getUserWorkExp = await 
+                (
+                from cert in _appContext.TblCertificates
+                join appbinary in _appContext.TblAppbinaries on cert.AttachImgId equals appbinary.Id
+                where cert.UserIdFk == currentUser.Id
+                select new GetUserCertificateDto
+                { 
+                    Id = cert.Id,
+                    Name = cert.Name,
+                    Issuer= cert.Issuer,
+                    Highlights = cert.Highlights,
+                    DateAchieved = cert.DateAchieved,
+                    Type = (CertificateTypeEnum)cert.CertificateType,
+                    UploadFile = appbinary.Byte,
+                    
+                }).ToListAsync();
+
+
+            return new ApiResponseMessage<IList<GetUserCertificateDto>>
+            {
+                Data = getUserWorkExp,
+                IsSuccess = true,
+                ErrorMessage = "",
+            };
+        }
+        public async Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId)
+        {
+            try
+            {
+                var apiMessage = "";
+                var getUserCert = await _appContext.TblCertificates.Where(x => x.Id == certificateId).FirstOrDefaultAsync();
+
+                if (getUserCert is null)
+                {
+                    apiMessage = "";
+                }
+                else
+                {
+                    _appContext.TblCertificates.Remove(getUserCert!);
+                    await _appContext.SaveChangesAsync();
+
+                    apiMessage = "Success";
+                }
+
+
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = !string.IsNullOrWhiteSpace(apiMessage),
+                    ErrorMessage = !string.IsNullOrWhiteSpace(apiMessage) ? "" : "No Data"
+                };
+            }
+            catch (Exception ex)
+            {
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = "",
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message,
+                };
+            }
+
+        }
+
     }
 }
