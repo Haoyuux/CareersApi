@@ -405,9 +405,14 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                var appBinary = userDetails.UserProfileImageId.HasValue
+                var appBinaryProfile = userDetails.UserProfileImageId.HasValue
                     ? await _appContext.TblAppbinaries
                         .FirstOrDefaultAsync(a => a.Id == userDetails.UserProfileImageId.Value)
+                    : null;
+
+                var appBinaryCover = userDetails.CoverPhotoImageId.HasValue
+                    ? await _appContext.TblAppbinaries
+                        .FirstOrDefaultAsync(a => a.Id == userDetails.CoverPhotoImageId!.Value)
                     : null;
 
                 //var getgends = await _dbContext.Hr201genders.ToListAsync();
@@ -430,7 +435,8 @@ namespace BrigadaCareersV3Library.AuthServices
                     Email = user.Email,
                     MiddleName = userDetails.MiddleName,
                     ContactNo = userDetails.ContactNo,
-                    UserProfileByte = appBinary?.Byte,
+                    UserProfileByte = appBinaryProfile?.Byte,
+                    UserCoverPhotoByte = appBinaryCover?.Byte,
                     Hr201GenderId = userDetails.Hr201GenderId,
                     Hr201CivilStatusId = userDetails.Hr201CivilStatus,
                     Gender = gender?.Name,
@@ -504,6 +510,98 @@ namespace BrigadaCareersV3Library.AuthServices
                 throw new Exception("User details not found");
 
             return joinUserDetails;
+        }
+        public async Task<ApiResponseMessage<string>> InsertOrUpdateUserCoverPhoto(InsertOrUpdateUserCoverPhotoDto input)
+        {
+            var response = new ApiResponseMessage<string>();
+
+            try
+            {
+                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                var currentUser = await GetCurrentUserIdAsync();
+
+
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+                if (userDetails == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "User not found";
+                    return response;
+                }
+
+                var hasNewImage = !string.IsNullOrEmpty(input.CoverImageBase64);
+
+                // 1) Remove only
+                if (input.RemoveCoverImage && !hasNewImage)
+                {
+                    if (userDetails.CoverPhotoImageId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
+                        userDetails.CoverPhotoImageId = null;
+                    }
+
+                    await _appContext.SaveChangesAsync();
+
+                    response.Data = "Removed";
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+                // 2) Replace / 3) Insert or Update
+                if (hasNewImage)
+                {
+                    if (input.RemoveCoverImage && userDetails.CoverPhotoImageId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
+                        userDetails.UserProfileImageId = null;
+                    }
+
+                    if (userDetails.CoverPhotoImageId == null)
+                    {
+                        var newId = await UploadNewProfileImageAsync(
+                            input.CoverImageBase64,
+                            input.CoverImageFileName,
+                            input.CoverImageContentType,
+                            "User Profile Cover"
+                            );
+
+                        userDetails.CoverPhotoImageId = newId;
+                        response.Data = "Inserted";
+                    }
+                    else
+                    {
+                        await UpdateProfileImageAsync(
+                            userDetails.CoverPhotoImageId.Value,
+                            input.CoverImageBase64,
+                            input.CoverImageFileName,
+                            input.CoverImageContentType,
+                            "User Cover Image"
+
+                            );
+
+                        response.Data = input.RemoveCoverImage ? "Replaced" : "Updated";
+                    }
+
+                    await _appContext.SaveChangesAsync();
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+
+                response.Data = "No changes";
+                response.IsSuccess = true;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.IsSuccess = false;
+                response.ErrorMessage = ex.Message;
+                return response;
+            }
         }
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
         {

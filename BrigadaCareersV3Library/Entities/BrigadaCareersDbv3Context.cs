@@ -48,6 +48,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
             optionsBuilder.UseSqlServer("DefaultCon");
         }
     }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AspNetRole>(entity =>
@@ -188,7 +189,11 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.ContactNo).HasMaxLength(50);
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
 
-            entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetails)
+            entity.HasOne(d => d.CoverPhotoImage).WithMany(p => p.TblUserDetailCoverPhotoImages)
+                .HasForeignKey(d => d.CoverPhotoImageId)
+                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary1");
+
+            entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetailUserProfileImages)
                 .HasForeignKey(d => d.UserProfileImageId)
                 .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary");
         });

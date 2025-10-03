@@ -21,7 +21,9 @@ public partial class TblAppbinary
 
     public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
 
-    public virtual ICollection<TblUserDetail> TblUserDetails { get; set; } = new List<TblUserDetail>();
+    public virtual ICollection<TblUserDetail> TblUserDetailCoverPhotoImages { get; set; } = new List<TblUserDetail>();
+
+    public virtual ICollection<TblUserDetail> TblUserDetailUserProfileImages { get; set; } = new List<TblUserDetail>();
 
     public virtual ICollection<TblUserResume> TblUserResumes { get; set; } = new List<TblUserResume>();
 }

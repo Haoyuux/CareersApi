@@ -37,6 +37,10 @@ public partial class TblUserDetail
 
     public Guid? UserProfileImageId { get; set; }
 
+    public Guid? CoverPhotoImageId { get; set; }
+
+    public virtual TblAppbinary? CoverPhotoImage { get; set; }
+
     public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
 
     public virtual ICollection<TblEducation> TblEducations { get; set; } = new List<TblEducation>();

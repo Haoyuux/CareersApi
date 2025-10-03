@@ -16,6 +16,7 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<UserLoginDto>> RefreshTokenAsync(string refreshToken);
         Task<ApiResponseMessage<bool>> InvalidateRefreshTokenAsync(string refreshToken);
         Task<ApiResponseMessage<bool>> LogoutAsync(string refreshToken);
+        Task<ApiResponseMessage<string>> InsertOrUpdateUserCoverPhoto(InsertOrUpdateUserCoverPhotoDto input);
         Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input);
         //EDUCATION
         Task<ApiResponseMessage<string>> CreateOrEditEducation(CreateOrEditEducationDto input);

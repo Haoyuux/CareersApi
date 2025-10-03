@@ -151,6 +151,25 @@ namespace BrigadaCareersV3.Controllers
             }
         }
 
+        [HttpPost("InsertOrUpdateUserCoverPhoto")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> InsertOrUpdateUserCoverPhoto([FromBody] InsertOrUpdateUserCoverPhotoDto input)
+        {
+            try
+            {
+                var result = await _userAuthentication.InsertOrUpdateUserCoverPhoto(input);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
         public record NominatimResult(
             [property: JsonPropertyName("place_id")] long PlaceId,
             [property: JsonPropertyName("display_name")] string DisplayName,
