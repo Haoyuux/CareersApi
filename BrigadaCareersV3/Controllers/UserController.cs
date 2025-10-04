@@ -6,6 +6,7 @@ using BrigadaCareersV3Library.Dto.UserDto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Org.BouncyCastle.Asn1.Crmf;
 using System.Text.Json.Serialization;
 using static BrigadaCareersV3Library.AuthServices.UserAuthenticationService;
 using static System.Net.WebRequestMethods;
@@ -308,6 +309,90 @@ namespace BrigadaCareersV3.Controllers
             }
             return BadRequest(result);
         }
+
+        //[Authorize]
+        //[HttpPost("GetSkill")]
+        //public async Task<ActionResult<ApiResponseMessage<string>>> GetSkill([FromBody] string text)
+        //{
+        //    var apiUrl = $"https://api.apilayer.com/skills?q={Uri.EscapeDataString(text)}";
+
+        //    using var client = new HttpClient();
+        //    client.DefaultRequestHeaders.Add("apikey", "Z6nkOjyv51B3q1X3d8mLaCnDlmzMe764");
+
+        //    try
+        //    {
+        //        var response = await client.GetAsync(apiUrl);
+        //        var responseContent = await response.Content.ReadAsStringAsync();
+
+        //        if (!response.IsSuccessStatusCode)
+        //        {
+        //            return BadRequest(new ApiResponseMessage<string>
+        //            {
+        //                IsSuccess = false,
+        //                ErrorMessage = $"Request failed: {response.ReasonPhrase}",
+        //                Data = responseContent
+        //            });
+        //        }
+
+        //        return Ok(new ApiResponseMessage<string>
+        //        {
+        //            IsSuccess = true,
+        //            ErrorMessage = "Skill data retrieved successfully",
+        //            Data = responseContent
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, new ApiResponseMessage<string>
+        //        {
+        //            IsSuccess = false,
+        //            ErrorMessage = $"Error occurred: {ex.Message}",
+        //            Data = null
+        //        });
+        //    }
+        //}
+
+        [Authorize]
+        [HttpPost("CreateOrEditSkills")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrEditSkills([FromBody] CreateOrEditSkillsDto input)
+        {
+
+
+            var result = await _userAuthentication.CreateOrEditSkills(input);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpGet("GetUserSkills")]
+        public async Task<ActionResult<ApiResponseMessage<IList<CreateOrEditSkillsDto>>>> GetUserSkills()
+        {
+            var result = await _userAuthentication.GetUserSkills();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [Authorize]
+        [HttpDelete("DeleteUserSkills")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserSkills(Guid skillId)
+        {
+            var result = await _userAuthentication.DeleteUserSkills(skillId);
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+
+
+
 
     }
 }

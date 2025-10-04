@@ -35,6 +35,8 @@ public partial class BrigadaCareersDbv3Context : DbContext
 
     public virtual DbSet<TblEducation> TblEducations { get; set; }
 
+    public virtual DbSet<TblSkill> TblSkills { get; set; }
+
     public virtual DbSet<TblUserDetail> TblUserDetails { get; set; }
 
     public virtual DbSet<TblUserResume> TblUserResumes { get; set; }
@@ -48,7 +50,6 @@ public partial class BrigadaCareersDbv3Context : DbContext
             optionsBuilder.UseSqlServer("DefaultCon");
         }
     }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AspNetRole>(entity =>
@@ -181,6 +182,23 @@ public partial class BrigadaCareersDbv3Context : DbContext
                 .HasConstraintName("FK_Tbl_Education_Tbl_UserDetails");
         });
 
+        modelBuilder.Entity<TblSkill>(entity =>
+        {
+            entity.ToTable("Tbl_Skills");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreationTime).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblSkills)
+                .HasForeignKey(d => d.UserIdFk)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Tbl_Skills_Tbl_UserDetails");
+        });
+
         modelBuilder.Entity<TblUserDetail>(entity =>
         {
             entity.ToTable("Tbl_UserDetails");
@@ -192,6 +210,10 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.HasOne(d => d.CoverPhotoImage).WithMany(p => p.TblUserDetailCoverPhotoImages)
                 .HasForeignKey(d => d.CoverPhotoImageId)
                 .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary1");
+
+            entity.HasOne(d => d.Resume).WithMany(p => p.TblUserDetailResumes)
+                .HasForeignKey(d => d.ResumeId)
+                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary2");
 
             entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetailUserProfileImages)
                 .HasForeignKey(d => d.UserProfileImageId)

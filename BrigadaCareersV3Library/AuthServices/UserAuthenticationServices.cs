@@ -1150,6 +1150,113 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
         }
+        //SKILLS
+        public async Task<ApiResponseMessage<string>> CreateOrEditSkills(CreateOrEditSkillsDto input)
+        {
+            if (input.Id == Guid.Empty)
+            {
+                //create
+                try
+                {
+                    var currentUser = await GetCurrentUserIdAsync();
+                    var insertSkill = new TblSkill
+                    {
+                        Id = Guid.NewGuid(),
+                        UserIdFk = currentUser.Id,
+                        CreationTime = DateTime.UtcNow,
+                        IsDeleted = false,
+                        Name = input.Name,
 
+                    };
+
+                    await _appContext.TblSkills.AddAsync(insertSkill);
+                    await _appContext.SaveChangesAsync();
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Success",
+                        IsSuccess = true,
+                        ErrorMessage = ""
+                    };
+                }
+                catch (Exception ex)
+                {
+
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "",
+                        IsSuccess = false,
+                        ErrorMessage = ex.Message
+                    };
+                }
+
+
+            }
+            else
+            {
+                //update
+            }
+            return null;
+        }
+        public async Task<ApiResponseMessage<IList<CreateOrEditSkillsDto>>> GetUserSkills()
+        {
+            var currentUser = await GetCurrentUserIdAsync();
+            var getUserSkills = await _appContext.TblSkills.Where(x => x.UserIdFk == currentUser.Id)
+                .Select(x => new CreateOrEditSkillsDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+              
+                })
+                .ToListAsync();
+
+
+            return new ApiResponseMessage<IList<CreateOrEditSkillsDto>>
+            {
+                Data = getUserSkills,
+                IsSuccess = true,
+                ErrorMessage = "",
+            };
+        }
+        public async Task<ApiResponseMessage<string>> DeleteUserSkills(Guid skillId)
+        {
+            try
+            {
+                var apiMessage = "";
+                var getUserSkill = await _appContext.TblSkills.Where(x => x.Id == skillId).FirstOrDefaultAsync();
+
+                if (getUserSkill is null)
+                {
+                    apiMessage = "";
+                }
+                else
+                {
+                    _appContext.TblSkills.Remove(getUserSkill!);
+                    await _appContext.SaveChangesAsync();
+
+                    apiMessage = "Success";
+                }
+
+
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = !string.IsNullOrWhiteSpace(apiMessage),
+                    ErrorMessage = !string.IsNullOrWhiteSpace(apiMessage) ? "" : "No Data"
+                };
+            }
+            catch (Exception ex)
+            {
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = "",
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message,
+                };
+            }
+
+        }
     }
 }

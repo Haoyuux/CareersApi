@@ -30,5 +30,9 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input);
         Task<ApiResponseMessage<IList<GetUserCertificateDto>>> GetUserCertificate();
         Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId);
+        //SKILLS
+        Task<ApiResponseMessage<string>> CreateOrEditSkills(CreateOrEditSkillsDto input);
+        Task<ApiResponseMessage<IList<CreateOrEditSkillsDto>>> GetUserSkills();
+        Task<ApiResponseMessage<string>> DeleteUserSkills(Guid skillId);
     }
 }
