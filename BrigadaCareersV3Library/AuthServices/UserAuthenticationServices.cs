@@ -415,6 +415,11 @@ namespace BrigadaCareersV3Library.AuthServices
                         .FirstOrDefaultAsync(a => a.Id == userDetails.CoverPhotoImageId!.Value)
                     : null;
 
+                var appBinaryResume = userDetails.ResumeId.HasValue
+                    ? await _appContext.TblAppbinaries
+                        .FirstOrDefaultAsync(a => a.Id == userDetails.ResumeId!.Value)
+                    : null;
+
                 //var getgends = await _dbContext.Hr201genders.ToListAsync();
 
                 var gender = userDetails.Hr201GenderId.HasValue
@@ -437,6 +442,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     ContactNo = userDetails.ContactNo,
                     UserProfileByte = appBinaryProfile?.Byte,
                     UserCoverPhotoByte = appBinaryCover?.Byte,
+                    UserResumeByte = appBinaryResume?.Byte,
                     Hr201GenderId = userDetails.Hr201GenderId,
                     Hr201CivilStatusId = userDetails.Hr201CivilStatus,
                     Gender = gender?.Name,
@@ -565,7 +571,7 @@ namespace BrigadaCareersV3Library.AuthServices
                             input.CoverImageBase64,
                             input.CoverImageFileName,
                             input.CoverImageContentType,
-                            "User Profile Cover"
+                            "User Profile Cover " + currentUser.FirstName
                             );
 
                         userDetails.CoverPhotoImageId = newId;
@@ -578,7 +584,7 @@ namespace BrigadaCareersV3Library.AuthServices
                             input.CoverImageBase64,
                             input.CoverImageFileName,
                             input.CoverImageContentType,
-                            "User Cover Image"
+                            "User Cover Image " + currentUser.FirstName
 
                             );
 
@@ -657,7 +663,7 @@ namespace BrigadaCareersV3Library.AuthServices
                             input.ProfileImageBase64,
                             input.ProfileImageFileName,
                             input.ProfileImageContentType,
-                            "User Profile Image"
+                            "User Profile Image " + currentUser.FirstName
                             );
 
                         userDetails.UserProfileImageId = newId;
@@ -670,7 +676,7 @@ namespace BrigadaCareersV3Library.AuthServices
                             input.ProfileImageBase64,
                             input.ProfileImageFileName,
                             input.ProfileImageContentType,
-                            "User Profile Image"
+                            "User Profile Image " + currentUser.FirstName
 
                             );
 
@@ -683,6 +689,98 @@ namespace BrigadaCareersV3Library.AuthServices
                 }
 
              
+                response.Data = "No changes";
+                response.IsSuccess = true;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.IsSuccess = false;
+                response.ErrorMessage = ex.Message;
+                return response;
+            }
+        }
+        public async Task<ApiResponseMessage<string>> InsertOrUpdateUserResume(InsertOrUpdateUserResumeDto input)
+        {
+            var response = new ApiResponseMessage<string>();
+
+            try
+            {
+                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                var currentUser = await GetCurrentUserIdAsync();
+
+
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+                if (userDetails == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "User not found";
+                    return response;
+                }
+
+                var hasNewImage = !string.IsNullOrEmpty(input.UserResumeBase64);
+
+                // 1) Remove only
+                if (input.RemoveUserResume && !hasNewImage)
+                {
+                    if (userDetails.UserProfileImageId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
+                        userDetails.ResumeId = null;
+                    }
+
+                    await _appContext.SaveChangesAsync();
+
+                    response.Data = "Removed";
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+                // 2) Replace / 3) Insert or Update
+                if (hasNewImage)
+                {
+                    if (input.RemoveUserResume && userDetails.ResumeId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
+                        userDetails.UserProfileImageId = null;
+                    }
+
+                    if (userDetails.UserProfileImageId == null)
+                    {
+                        var newId = await UploadNewProfileImageAsync(
+                            input.UserResumeBase64,
+                            input.UserResumeFileName,
+                            input.UserResumeContentType,
+                            "User Resume " + currentUser.FirstName
+                            );
+
+                        userDetails.UserProfileImageId = newId;
+                        response.Data = "Inserted";
+                    }
+                    else
+                    {
+                        await UpdateProfileImageAsync(
+                            userDetails.UserProfileImageId.Value,
+                            input.UserResumeBase64,
+                            input.UserResumeFileName,
+                            input.UserResumeContentType,
+                            "User Resume "+ currentUser.FirstName
+
+                            );
+
+                        response.Data = input.RemoveUserResume ? "Replaced" : "Updated";
+                    }
+
+                    await _appContext.SaveChangesAsync();
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+
                 response.Data = "No changes";
                 response.IsSuccess = true;
                 return response;
@@ -778,7 +876,6 @@ namespace BrigadaCareersV3Library.AuthServices
             // Default to .jpg if nothing else works
             return ".jpg";
         }
-
         private async Task SoftDeleteBinaryAsync(Guid id)
         {
             var appBinary = await _appContext.TblAppbinaries.FirstOrDefaultAsync(b => b.Id == id);
