@@ -171,6 +171,25 @@ namespace BrigadaCareersV3.Controllers
             }
         }
 
+        [HttpPost("InsertOrUpdateUserResume")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> InsertOrUpdateUserResume([FromBody] InsertOrUpdateUserResumeDto input)
+        {
+            try
+            {
+                var result = await _userAuthentication.InsertOrUpdateUserResume(input);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
         public record NominatimResult(
             [property: JsonPropertyName("place_id")] long PlaceId,
             [property: JsonPropertyName("display_name")] string DisplayName,

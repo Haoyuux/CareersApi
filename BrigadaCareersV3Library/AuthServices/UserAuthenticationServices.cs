@@ -727,7 +727,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 // 1) Remove only
                 if (input.RemoveUserResume && !hasNewImage)
                 {
-                    if (userDetails.UserProfileImageId.HasValue)
+                    if (userDetails.ResumeId.HasValue)
                     {
                         await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
                         userDetails.ResumeId = null;
@@ -746,10 +746,10 @@ namespace BrigadaCareersV3Library.AuthServices
                     if (input.RemoveUserResume && userDetails.ResumeId.HasValue)
                     {
                         await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
-                        userDetails.UserProfileImageId = null;
+                        userDetails.ResumeId = null;
                     }
 
-                    if (userDetails.UserProfileImageId == null)
+                    if (userDetails.ResumeId == null)
                     {
                         var newId = await UploadNewProfileImageAsync(
                             input.UserResumeBase64,
@@ -758,13 +758,13 @@ namespace BrigadaCareersV3Library.AuthServices
                             "User Resume " + currentUser.FirstName
                             );
 
-                        userDetails.UserProfileImageId = newId;
+                        userDetails.ResumeId = newId;
                         response.Data = "Inserted";
                     }
                     else
                     {
                         await UpdateProfileImageAsync(
-                            userDetails.UserProfileImageId.Value,
+                            userDetails.ResumeId.Value,
                             input.UserResumeBase64,
                             input.UserResumeFileName,
                             input.UserResumeContentType,
