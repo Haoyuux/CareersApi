@@ -7,5 +7,6 @@ namespace JobPostingLibrary.HrmsServices
         Task<ApiResponseMessageHrms<IList<GetAllJobPostsDto>>> GetAllJobPosts();
         Task<ApiResponseMessageHrms<IList<GetAllGenderDto>>> GetAllGender();
         Task<ApiResponseMessageHrms<IList<GetAllCivilStatusDto>>> GetAllCivilStatus();
+        Task<ApiResponseMessageHrms<IList<GetRequirmentsDto>>> GetRequirements();
     }
 }

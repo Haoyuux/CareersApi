@@ -41,6 +41,8 @@ public partial class TblUserDetail
 
     public Guid? ResumeId { get; set; }
 
+    public Guid? UserReqId { get; set; }
+
     public virtual TblAppbinary? CoverPhotoImage { get; set; }
 
     public virtual TblAppbinary? Resume { get; set; }
@@ -56,4 +58,6 @@ public partial class TblUserDetail
     public virtual ICollection<TblWorkExperience> TblWorkExperiences { get; set; } = new List<TblWorkExperience>();
 
     public virtual TblAppbinary? UserProfileImage { get; set; }
+
+    public virtual TblUserRequirement? UserReq { get; set; }
 }

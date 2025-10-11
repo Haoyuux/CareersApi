@@ -5,6 +5,7 @@ using BrigadaCareersV3Library.Dto.Enums;
 using BrigadaCareersV3Library.Dto.UserDto;
 using BrigadaCareersV3Library.Entities;
 using JobPostingLibrary.Entities;
+using JobPostingLibrary.HrmsDtos;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -1354,6 +1355,184 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
 
+        }
+
+        //public async Task<ApiResponseMessage<string>> CreateOrUpdateSubmissionReq(CreateOrUpdateSubmissionReqDto Dto)
+        //{
+        //    try
+        //    {
+
+        //        //if (Dto.UserId == Guid.Empty) {
+
+        //        //}
+        //        var apiMessage = "";
+        //        var checkReqList = await _appContext.TblUserRequirements.FirstOrDefaultAsync(x => x.Id == Dto.ReqSubmission);
+
+        //        if (checkReqList is null)
+        //        {
+
+        //            var ApplicantRequirments = new TblUserRequirement
+        //            {
+        //                Id = Guid.NewGuid(),
+        //                UserId = Dto.UserId,
+        //                FileName = Dto.Filename,
+        //                Byte = Dto.Byte,
+        //                DateUpload = DateTime.Now,
+        //                Status = 1,
+        //                RecrtmntRequirementChecklistId = Dto.RecrtmntRequirementCheckListId,
+        //                IsDeleted = false,
+        //                CreationTime = DateTime.UtcNow,
+
+
+        //            };
+
+        //            apiMessage = "Inserted";
+        //            _appContext.TblUserRequirements.Add(ApplicantRequirments);
+        //            await _appContext.SaveChangesAsync();
+        //        }
+        //        else
+        //        {
+
+        //            var getData = await _appContext.TblUserRequirements.FirstOrDefaultAsync(x => x.Id == Dto.ReqSubmission);
+        //            if (getData is not null)
+        //            {
+
+        //                getData.FileName = Dto.Filename;
+        //                getData.Byte = Dto.Byte;
+        //                getData.DateUpload = DateTime.Now;
+        //                getData.Status = 1;
+        //                _appContext.TblUserRequirements.Update(getData);
+        //                await _appContext.SaveChangesAsync();
+        //            }
+
+
+
+        //            apiMessage = "Updated";
+
+
+        //        }
+
+        //        return new ApiResponseMessage<string>
+        //        {
+        //            Data = apiMessage,
+        //            IsSuccess = true,
+        //            ErrorMessage = ""
+
+
+        //        }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponseMessage<string>
+        //        {
+        //            Data = "Failed",
+        //            IsSuccess = false,
+        //            ErrorMessage = ex.InnerException!.Message
+
+        //        };
+
+
+        //    }
+        //}
+
+        public async Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input)
+        {
+            var response = new ApiResponseMessage<string>();
+
+            try
+            {
+                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+                var currentUser = await GetCurrentUserIdAsync();
+
+
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+                if (userDetails == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "User not found";
+                    return response;
+                }
+
+                var hasNewImage = !string.IsNullOrEmpty(input.UserReqFileBase64);
+
+                // 1) Remove only
+                if (input.RemoveUserReqFile && !hasNewImage)
+                {
+                    if (userDetails.ResumeId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
+                        userDetails.UserReqId = null;
+                    }
+
+                    await _appContext.SaveChangesAsync();
+
+                    response.Data = "Removed";
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+                // 2) Replace / 3) Insert or Update
+                if (hasNewImage)
+                {
+                    if (input.RemoveUserReqFile && userDetails.ResumeId.HasValue)
+                    {
+                        await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
+                        userDetails.UserReqId = null;
+                    }
+
+                    if (userDetails.UserReqId == null)
+                    {
+
+                        var insertUserReq = new TblUserRequirement
+                        {
+                            Id = Guid.NewGuid(),
+                            //TO DO HERE <<<<<<<--------------------------------------------------
+                            
+                        };
+
+                        var newId = await UploadNewProfileImageAsync(
+                            input.UserReqFileBase64,
+                            input.UserReqFileName,
+                            input.UserReqFileContentType,
+                            "User File Requirements " + currentUser.FirstName
+                            );
+
+                        userDetails.UserReqId = newId;
+                        response.Data = "Inserted";
+                    }
+                    else
+                    {
+                        await UpdateProfileImageAsync(
+                            userDetails.UserReqId.Value,
+                            input.UserReqFileBase64,
+                            input.UserReqFileName,
+                            input.UserReqFileContentType,
+                            "User File Requirements " + currentUser.FirstName
+
+                            );
+
+                        response.Data = input.RemoveUserReqFile ? "Replaced" : "Updated";
+                    }
+
+                    await _appContext.SaveChangesAsync();
+                    response.IsSuccess = true;
+                    return response;
+                }
+
+
+                response.Data = "No changes";
+                response.IsSuccess = true;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.IsSuccess = false;
+                response.ErrorMessage = ex.Message;
+                return response;
+            }
         }
     }
 }

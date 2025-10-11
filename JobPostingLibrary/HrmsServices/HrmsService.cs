@@ -192,5 +192,41 @@ namespace JobPostingLibrary.HrmsServices
 
             }
         }
+
+        public async Task<ApiResponseMessageHrms<IList<GetRequirmentsDto>>> GetRequirements()
+        {
+            try
+            {
+
+
+                var _data = await _dbContext.RecrtmntRequirementChecklists
+                    .Where(g => !g.IsDeleted && !g.Name.ToLower().Contains("others"))
+                    .Select(x => new GetRequirmentsDto
+                    {
+                        Id = x.Id,
+                        Name = x.Name.ToLower()
+                    })
+                    .ToListAsync();
+
+                return new ApiResponseMessageHrms<IList<GetRequirmentsDto>>
+                {
+                    Data = _data,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+
+
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessageHrms<IList<GetRequirmentsDto>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException!.Message
+                };
+            }
+        }
+
     }
 }

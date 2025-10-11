@@ -1,7 +1,9 @@
 ﻿using BrigadaCareersV3Library.ApiResponseMessage;
 using BrigadaCareersV3Library.AuthServices;
+using BrigadaCareersV3Library.Dto.AuthDto;
 using JobPostingLibrary.HrmsDtos;
 using JobPostingLibrary.HrmsServices;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -84,6 +86,18 @@ namespace BrigadaCareersV3.Controllers
                 return res;
             }
 
+        }
+
+        //[Authorize]
+        [HttpGet("GetRequirements")]
+        public async Task<ActionResult<ApiResponseMessageHrms<IList<GetRequirmentsDto>>>> GetRequirements()
+        {
+            var result = await _hrmsService.GetRequirements();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
         }
     }
 }

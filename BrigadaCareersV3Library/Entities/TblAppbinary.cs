@@ -27,5 +27,7 @@ public partial class TblAppbinary
 
     public virtual ICollection<TblUserDetail> TblUserDetailUserProfileImages { get; set; } = new List<TblUserDetail>();
 
+    public virtual ICollection<TblUserRequirement> TblUserRequirements { get; set; } = new List<TblUserRequirement>();
+
     public virtual ICollection<TblUserResume> TblUserResumes { get; set; } = new List<TblUserResume>();
 }
