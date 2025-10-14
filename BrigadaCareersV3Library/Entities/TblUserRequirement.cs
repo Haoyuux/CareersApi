@@ -9,6 +9,8 @@ public partial class TblUserRequirement
 
     public Guid? UseReqId { get; set; }
 
+    public Guid? UserDetailsId { get; set; }
+
     public int? Status { get; set; }
 
     public Guid RecrtmntRequirementChecklistId { get; set; }
@@ -19,7 +21,7 @@ public partial class TblUserRequirement
 
     public bool IsDeleted { get; set; }
 
-    public virtual ICollection<TblUserDetail> TblUserDetails { get; set; } = new List<TblUserDetail>();
-
     public virtual TblAppbinary? UseReq { get; set; }
+
+    public virtual TblUserDetail? UserDetails { get; set; }
 }

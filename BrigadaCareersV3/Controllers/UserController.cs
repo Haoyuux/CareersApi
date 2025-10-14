@@ -3,6 +3,7 @@ using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.AuthServices;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
+using JobPostingLibrary.HrmsDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -410,7 +411,36 @@ namespace BrigadaCareersV3.Controllers
         }
 
 
+        [HttpPost("CreateOrUpdateReqSubmission")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CreateOrUpdateReqSubmission([FromBody] CreateOrUpdateReqSubmissionDto input)
+        {
+            try
+            {
+                var result = await _userAuthentication.CreateOrUpdateReqSubmission(input);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
 
+        [Authorize]
+        [HttpGet("GetRequirementsV1")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetRequirmentsDto>>>> GetRequirementsV1()
+        {
+            var result = await _userAuthentication.GetRequirementsV1();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
 
 
     }

@@ -2,6 +2,7 @@
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
+using JobPostingLibrary.HrmsDtos;
 using static BrigadaCareersV3Library.AuthServices.UserAuthenticationService;
 
 namespace BrigadaCareersV3Library.AuthServices
@@ -35,5 +36,8 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<string>> CreateOrEditSkills(CreateOrEditSkillsDto input);
         Task<ApiResponseMessage<IList<CreateOrEditSkillsDto>>> GetUserSkills();
         Task<ApiResponseMessage<string>> DeleteUserSkills(Guid skillId);
+
+        Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input);
+        Task<ApiResponseMessage<IList<GetRequirmentsDto>>> GetRequirementsV1();
     }
 }

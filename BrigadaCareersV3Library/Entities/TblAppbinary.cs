@@ -13,6 +13,8 @@ public partial class TblAppbinary
 
     public DateTime DateUpload { get; set; }
 
+    public int? TypeEnum { get; set; }
+
     public bool IsDeleted { get; set; }
 
     public string Description { get; set; } = null!;

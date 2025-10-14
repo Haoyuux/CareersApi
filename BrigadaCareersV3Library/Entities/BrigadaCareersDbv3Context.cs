@@ -220,10 +220,6 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetailUserProfileImages)
                 .HasForeignKey(d => d.UserProfileImageId)
                 .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary");
-
-            entity.HasOne(d => d.UserReq).WithMany(p => p.TblUserDetails)
-                .HasForeignKey(d => d.UserReqId)
-                .HasConstraintName("FK_Tbl_UserDetails_Tbl_UserRequirements");
         });
 
         modelBuilder.Entity<TblUserRequirement>(entity =>
@@ -234,10 +230,15 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
             entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
             entity.Property(e => e.Remarks).IsUnicode(false);
+            entity.Property(e => e.UserDetailsId).HasColumnName("userDetailsId");
 
             entity.HasOne(d => d.UseReq).WithMany(p => p.TblUserRequirements)
                 .HasForeignKey(d => d.UseReqId)
                 .HasConstraintName("FK_Tbl_UserRequirements_Tbl_Appbinary");
+
+            entity.HasOne(d => d.UserDetails).WithMany(p => p.TblUserRequirements)
+                .HasForeignKey(d => d.UserDetailsId)
+                .HasConstraintName("FK_Tbl_UserRequirements_Tbl_UserDetails");
         });
 
         modelBuilder.Entity<TblUserResume>(entity =>

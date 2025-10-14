@@ -1357,92 +1357,13 @@ namespace BrigadaCareersV3Library.AuthServices
 
         }
 
-        //public async Task<ApiResponseMessage<string>> CreateOrUpdateSubmissionReq(CreateOrUpdateSubmissionReqDto Dto)
-        //{
-        //    try
-        //    {
-
-        //        //if (Dto.UserId == Guid.Empty) {
-
-        //        //}
-        //        var apiMessage = "";
-        //        var checkReqList = await _appContext.TblUserRequirements.FirstOrDefaultAsync(x => x.Id == Dto.ReqSubmission);
-
-        //        if (checkReqList is null)
-        //        {
-
-        //            var ApplicantRequirments = new TblUserRequirement
-        //            {
-        //                Id = Guid.NewGuid(),
-        //                UserId = Dto.UserId,
-        //                FileName = Dto.Filename,
-        //                Byte = Dto.Byte,
-        //                DateUpload = DateTime.Now,
-        //                Status = 1,
-        //                RecrtmntRequirementChecklistId = Dto.RecrtmntRequirementCheckListId,
-        //                IsDeleted = false,
-        //                CreationTime = DateTime.UtcNow,
-
-
-        //            };
-
-        //            apiMessage = "Inserted";
-        //            _appContext.TblUserRequirements.Add(ApplicantRequirments);
-        //            await _appContext.SaveChangesAsync();
-        //        }
-        //        else
-        //        {
-
-        //            var getData = await _appContext.TblUserRequirements.FirstOrDefaultAsync(x => x.Id == Dto.ReqSubmission);
-        //            if (getData is not null)
-        //            {
-
-        //                getData.FileName = Dto.Filename;
-        //                getData.Byte = Dto.Byte;
-        //                getData.DateUpload = DateTime.Now;
-        //                getData.Status = 1;
-        //                _appContext.TblUserRequirements.Update(getData);
-        //                await _appContext.SaveChangesAsync();
-        //            }
-
-
-
-        //            apiMessage = "Updated";
-
-
-        //        }
-
-        //        return new ApiResponseMessage<string>
-        //        {
-        //            Data = apiMessage,
-        //            IsSuccess = true,
-        //            ErrorMessage = ""
-
-
-        //        }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponseMessage<string>
-        //        {
-        //            Data = "Failed",
-        //            IsSuccess = false,
-        //            ErrorMessage = ex.InnerException!.Message
-
-        //        };
-
-
-        //    }
-        //}
-
         public async Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input)
         {
             var response = new ApiResponseMessage<string>();
 
             try
             {
-                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
                 var currentUser = await GetCurrentUserIdAsync();
-
 
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
@@ -1455,20 +1376,30 @@ namespace BrigadaCareersV3Library.AuthServices
                     return response;
                 }
 
+                // Find existing requirement for this user + checklist item combination
+                var getReq = await _appContext.TblUserRequirements
+                    .Where(x => x.UserDetailsId == userDetails.Id
+                             && x.RecrtmntRequirementChecklistId == input.RecrtmntRequirementCheckListId
+                             && !x.IsDeleted)
+                    .FirstOrDefaultAsync();
+
                 var hasNewImage = !string.IsNullOrEmpty(input.UserReqFileBase64);
 
                 // 1) Remove only
                 if (input.RemoveUserReqFile && !hasNewImage)
                 {
-                    if (userDetails.ResumeId.HasValue)
+                    if (getReq != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
-                        userDetails.UserReqId = null;
+                        await SoftDeleteBinaryAsync(getReq.Id);
+                        getReq.IsDeleted = true;
+                        await _appContext.SaveChangesAsync();
+
+                        response.Data = "Removed";
+                        response.IsSuccess = true;
+                        return response;
                     }
 
-                    await _appContext.SaveChangesAsync();
-
-                    response.Data = "Removed";
+                    response.Data = "No requirement found to remove";
                     response.IsSuccess = true;
                     return response;
                 }
@@ -1476,51 +1407,60 @@ namespace BrigadaCareersV3Library.AuthServices
                 // 2) Replace / 3) Insert or Update
                 if (hasNewImage)
                 {
-                    if (input.RemoveUserReqFile && userDetails.ResumeId.HasValue)
+                    // If replacing existing requirement
+                    if (input.RemoveUserReqFile && getReq != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
-                        userDetails.UserReqId = null;
+                        await SoftDeleteBinaryAsync(getReq.Id);
+                        getReq.IsDeleted = true;
                     }
 
-                    if (userDetails.UserReqId == null)
+                    // INSERT: No existing requirement found
+                    if (getReq == null)
                     {
+                        var newBinaryId = await UploadNewProfileImageAsync(
+                            input.UserReqFileBase64,
+                            input.UserReqFileName,
+                            input.UserReqFileContentType,
+                            "User File Requirements " + currentUser.FirstName
+                        );
 
                         var insertUserReq = new TblUserRequirement
                         {
                             Id = Guid.NewGuid(),
-                            //TO DO HERE <<<<<<<--------------------------------------------------
-                            
+                            UseReqId = newBinaryId,
+                            UserDetailsId = userDetails.Id,
+                            RecrtmntRequirementChecklistId = input.RecrtmntRequirementCheckListId,
+                            Status = (int)RequirementsStatusEnum.Pending,
+                            CreationTime = DateTime.UtcNow,
+                            IsDeleted = false,
                         };
 
-                        var newId = await UploadNewProfileImageAsync(
-                            input.UserReqFileBase64,
-                            input.UserReqFileName,
-                            input.UserReqFileContentType,
-                            "User File Requirements " + currentUser.FirstName
-                            );
+                        await _appContext.TblUserRequirements.AddAsync(insertUserReq);
+                        await _appContext.SaveChangesAsync();
 
-                        userDetails.UserReqId = newId;
                         response.Data = "Inserted";
+                        response.IsSuccess = true;
+                        return response;
                     }
+                    // UPDATE: Requirement exists
                     else
                     {
                         await UpdateProfileImageAsync(
-                            userDetails.UserReqId.Value,
+                            getReq.UseReqId.Value,
                             input.UserReqFileBase64,
                             input.UserReqFileName,
                             input.UserReqFileContentType,
                             "User File Requirements " + currentUser.FirstName
+                        );
 
-                            );
+                        getReq.Status = (int)RequirementsStatusEnum.Pending; // Reset to pending on update
+                        await _appContext.SaveChangesAsync();
 
                         response.Data = input.RemoveUserReqFile ? "Replaced" : "Updated";
+                        response.IsSuccess = true;
+                        return response;
                     }
-
-                    await _appContext.SaveChangesAsync();
-                    response.IsSuccess = true;
-                    return response;
                 }
-
 
                 response.Data = "No changes";
                 response.IsSuccess = true;
@@ -1532,6 +1472,95 @@ namespace BrigadaCareersV3Library.AuthServices
                 response.IsSuccess = false;
                 response.ErrorMessage = ex.Message;
                 return response;
+            }
+        }
+
+        public async Task<ApiResponseMessage<IList<GetRequirmentsDto>>> GetRequirementsV1()
+        {
+            try
+            {
+
+
+                // First, get data from HRMS context
+                var hrmsReqs = await _dbContext.RecrtmntRequirementChecklists
+                    .Select(hrmsreq => new
+                    {
+                        hrmsreq.Id,
+                        hrmsreq.Name
+                    })
+                    .ToListAsync();
+
+                // Get the IDs to filter the second query
+                var hrmsReqIds = hrmsReqs.Select(h => h.Id).ToList();
+
+                // Second, get data from App context
+                var userReqsWithBinaries = await (
+                    from userreq in _appContext.TblUserRequirements
+                    where hrmsReqIds.Contains(userreq.RecrtmntRequirementChecklistId)
+                    join appbinary in _appContext.TblAppbinaries
+                        on userreq.UseReqId equals appbinary.Id into appbinaryGroup
+                    from appbinary in appbinaryGroup.DefaultIfEmpty()
+                    select new
+                    {
+                        userreq.RecrtmntRequirementChecklistId,
+                        FileName = appbinary != null ? appbinary.FileName : null,
+                        DateUpload = appbinary != null ? appbinary.CreationTime : (DateTime?)null,
+                        userreq.Remarks,
+                        userreq.Status
+                    }
+                ).ToListAsync();
+
+                // Join in memory
+                var getReq = hrmsReqs
+                    .GroupJoin(
+                        userReqsWithBinaries,
+                        h => h.Id,
+                        u => u.RecrtmntRequirementChecklistId,
+                        (h, userGroup) => new { h, userGroup })
+                    .SelectMany(
+                        x => x.userGroup.DefaultIfEmpty(),
+                        (x, u) => new GetRequirmentsDto
+                        {
+                            Id = x.h.Id,
+                            CheckListName = x.h.Name,
+                            FileName = u?.FileName! ?? "-",
+                            DateUpload = u?.DateUpload?.ToString("MMM dd, yyyy")! ?? "-",
+                            Remarks = u?.Remarks ?? "-",
+                            Status = u != null ? ((RequirementsStatusEnum)u.Status!).ToString() : string.Empty
+
+
+                        })
+                    .ToList();
+
+
+
+
+                //var _data = await _dbContext.RecrtmntRequirementChecklists
+                //    .Where(g => !g.IsDeleted && !g.Name.ToLower().Contains("others"))
+                //    .Select(x => new GetRequirmentsDto
+                //    {
+                //        Id = x.Id,
+                //        Name = x.Name.ToLower()
+                //    })
+                //    .ToListAsync();
+
+                return new ApiResponseMessage<IList<GetRequirmentsDto>>
+                {
+                    Data = getReq,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+
+
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<IList<GetRequirmentsDto>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException!.Message
+                };
             }
         }
     }
