@@ -8,10 +8,12 @@ using JobPostingLibrary.Entities;
 using JobPostingLibrary.HrmsDtos;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 
@@ -1562,6 +1564,322 @@ namespace BrigadaCareersV3Library.AuthServices
                     ErrorMessage = ex.InnerException!.Message
                 };
             }
+        }
+
+
+
+        public async Task<ApiResponseMessage<string>> ValidationPrimarySecondary(Guid userId)
+        {
+            try
+            {
+                var educationRecords = await _appContext.TblEducations
+                    .Where(x => x.UserIdFk == userId &&
+                           (x.EducationLevel == "Primary education" || x.EducationLevel == "Secondary education"))
+                    .ToListAsync();
+
+                var hasPrimary = educationRecords.Any(x => x.EducationLevel == "Primary education");
+                var hasSecondary = educationRecords.Any(x => x.EducationLevel == "Secondary education");
+
+                if (hasPrimary && hasSecondary)
+                {
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Both Primary and Secondary Education are already provided.",
+                        IsSuccess = false,
+                        ErrorMessage = string.Empty
+                    };
+                }
+
+                var missingEducation = (!hasPrimary, !hasSecondary) switch
+                {
+                    (true, true) => "Please Input Primary or Secondary Education before proceeding",
+                    (true, false) => "Please Input Primary Education before proceeding",
+                    (false, true) => "Please Input Secondary Education before proceeding",
+                    _ => string.Empty
+                };
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = missingEducation,
+                    IsSuccess = !string.IsNullOrEmpty(missingEducation),
+                    ErrorMessage = string.Empty
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<string>
+                {
+                    Data = string.Empty,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        // Main Application Method
+        public async Task<ApiResponseMessage<string>> InsertToApplicantMasterList([FromBody] applicantdataDto applyDto)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserIdAsync();
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+                if (userDetails == null)
+                {
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "User details not found"
+                    };
+                }
+
+                var validationResult = await ValidationPrimarySecondary(currentUser.UserId);
+                if (validationResult.IsSuccess)
+                {
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "NoPrimaryOrSecondary",
+                        IsSuccess = false,
+                        ErrorMessage = validationResult.Data
+                    };
+                }
+
+                if (!IsUserProfileComplete(userDetails))
+                {
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = "Missing Data",
+                        IsSuccess = false,
+                        ErrorMessage = "Please input missing profile data before proceeding!"
+                    };
+                }
+
+                var existingMasterlist = await _dbContext.RecrtmntApplicantMasterlists
+                    .FirstOrDefaultAsync(x => x.UserId == currentUser.UserId);
+
+                if (existingMasterlist != null)
+                {
+                    return await HandleExistingApplicant(existingMasterlist, userDetails, applyDto, currentUser.UserId);
+                }
+
+                return await CreateNewApplicant(userDetails, applyDto, currentUser.UserId);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message
+                };
+            }
+        }
+
+        // Helper Methods
+        private bool IsUserProfileComplete(TblUserDetail userDetails)
+        {
+            var requiredFields = new[]
+            {
+                userDetails.FirstName,
+                userDetails.LastName,
+                userDetails.ContactNo,
+                userDetails.EmailAddress,
+                userDetails.DateOfBirth?.ToString(),
+                userDetails.Hr201GenderId?.ToString(),
+                userDetails.Hr201CivilStatus?.ToString(),
+                userDetails.Address
+    };
+
+            return !requiredFields.Any(string.IsNullOrEmpty);
+        }
+
+        private async Task<ApiResponseMessage<string>> HandleExistingApplicant(
+            RecrtmntApplicantMasterlist masterlist,
+            TblUserDetail userDetails,
+            applicantdataDto applyDto,
+            Guid userId)
+        {
+            UpdateMasterlistFromUserDetails(masterlist, userDetails);
+            await _dbContext.SaveChangesAsync();
+
+            var activeApplication = await _dbContext.RecrtmntJobPostingDetails
+                .Where(x => x.RecrtmntApplicantMasterlistId == masterlist.Id &&
+                       (x.Status == (int)ApplicationStatus.Hired || x.Status == (int)ApplicationStatus.OnProgress))
+                .FirstOrDefaultAsync();
+
+            if (activeApplication != null)
+            {
+                return activeApplication.Status == (int)ApplicationStatus.Hired
+                    ? CreateErrorResponse("You're already hired; you can't apply for this job.")
+                    : CreateErrorResponse("The user application is currently ongoing with another job.");
+            }
+
+            var jobPostingDetail = await _dbContext.RecrtmntJobPostingDetails
+                .FirstOrDefaultAsync(x => x.RecrtmntApplicantMasterlistId == masterlist.Id &&
+                                    x.RecrtmntJobPostingHeaderId == applyDto.jobPostingId);
+
+            if (jobPostingDetail != null)
+            {
+                return HandleExistingJobApplication(jobPostingDetail);
+            }
+
+            return await CreateNewJobApplication(masterlist.Id, applyDto, userId);
+        }
+
+        private void UpdateMasterlistFromUserDetails(RecrtmntApplicantMasterlist masterlist, TblUserDetail userDetails)
+        {
+            masterlist.FirstName = userDetails.FirstName!;
+            masterlist.MiddleName = userDetails.MiddleName ?? string.Empty;
+            masterlist.LastName = userDetails.LastName!;
+            masterlist.ContactNo = userDetails.ContactNo;
+            masterlist.EmailAddress = userDetails.EmailAddress!;
+            masterlist.DateOfBirth = userDetails.DateOfBirth;
+            masterlist.Address = userDetails.Address!;
+            masterlist.Hr201genderId = userDetails.Hr201GenderId;
+            masterlist.Hr201civilStatusId = userDetails.Hr201CivilStatus;
+            masterlist.Type = 1;
+        }
+
+        private ApiResponseMessage<string> HandleExistingJobApplication(RecrtmntJobPostingDetail jobPostingDetail)
+        {
+            var statusMessages = new Dictionary<ApplicationStatus, string>
+    {
+        { ApplicationStatus.Failed, "Oops! It seems your previous application didn't quite hit the mark. Feel free to explore other opportunities or reach out if you have questions about your previous application. Good luck out there!" },
+        { ApplicationStatus.Cancelled, "Oops! It seems your previous application didn't quite hit the mark. Feel free to explore other opportunities or reach out if you have questions about your previous application. Good luck out there!" },
+        { ApplicationStatus.OnProgress, "The user application is in progress!" },
+        { ApplicationStatus.ForPooling, "The user application is for pooling!" },
+        { ApplicationStatus.Pending, "The user application is still pending!" }
+    };
+
+            var status = (ApplicationStatus)jobPostingDetail.Status;
+
+            if (statusMessages.TryGetValue(status, out var message))
+            {
+                return CreateErrorResponse(message);
+            }
+
+            return CreateErrorResponse("Unable to process application.");
+        }
+
+        private async Task<ApiResponseMessage<string>> CreateNewJobApplication(Guid masterlistId, applicantdataDto applyDto, Guid userId)
+        {
+            var allowedStatuses = new[]
+            {
+        (int)ApplicationStatus.Pending,
+        (int)ApplicationStatus.OnProgress,
+        (int)ApplicationStatus.Cancelled,
+        (int)ApplicationStatus.Qualified,
+        (int)ApplicationStatus.Rejected
+    };
+
+            var applicationCount = await _dbContext.RecrtmntJobPostingDetails
+                .CountAsync(x => x.RecrtmntApplicantMasterlistId == masterlistId &&
+                            allowedStatuses.Contains(x.Status));
+
+            if (applicationCount >= 3)
+            {
+                return CreateErrorResponse("The user has exceeded the limit of 3 applications.");
+            }
+
+            var jobPostingDetail = await CreateJobPostingDetail(masterlistId, applyDto, userId);
+            await _dbContext.RecrtmntJobPostingDetails.AddAsync(jobPostingDetail);
+            await _dbContext.SaveChangesAsync();
+
+            return new ApiResponseMessage<string>
+            {
+                Data = null,
+                IsSuccess = true,
+                ErrorMessage = string.Empty
+            };
+        }
+
+        private async Task<ApiResponseMessage<string>> CreateNewApplicant(TblUserDetail userDetails, applicantdataDto applyDto, Guid userId)
+        {
+            var masterlist = new RecrtmntApplicantMasterlist
+            {
+                Id = Guid.NewGuid(),
+                TenantId = 2,
+                CreationTime = DateTime.Now,
+                CreatorUserId = 2,
+                FirstName = userDetails.FirstName!,
+                MiddleName = userDetails.MiddleName ?? string.Empty,
+                LastName = userDetails.LastName!,
+                ContactNo = userDetails.ContactNo,
+                EmailAddress = userDetails.EmailAddress!,
+                DateOfBirth = userDetails.DateOfBirth,
+                Address = userDetails.Address!,
+                Hr201genderId = userDetails.Hr201GenderId,
+                Hr201civilStatusId = userDetails.Hr201CivilStatus,
+                UserId = userDetails.UserId,
+                Type = 1,
+                RecrtmntJobPostingDetails = new List<RecrtmntJobPostingDetail>
+        {
+            await CreateJobPostingDetail(Guid.NewGuid(), applyDto, userId)
+        }
+            };
+
+            _dbContext.RecrtmntApplicantMasterlists.Add(masterlist);
+            await _dbContext.SaveChangesAsync();
+
+            return new ApiResponseMessage<string>
+            {
+                Data = null,
+                IsSuccess = true,
+                ErrorMessage = string.Empty
+            };
+        }
+
+        private async Task<RecrtmntJobPostingDetail> CreateJobPostingDetail(Guid masterlistId, applicantdataDto applyDto, Guid userId)
+        {
+            var detailId = Guid.NewGuid();
+            var applicantNo = await GenerateApplicantNo(applyDto);
+
+            return new RecrtmntJobPostingDetail
+            {
+                Id = detailId,
+                RecrtmntApplicantMasterlistId = masterlistId,
+                RecrtmntJobPostingHeaderId = applyDto.jobPostingId,
+                PlantillaJobTitleId = applyDto.jobTitleId,
+                Status = (int)ApplicationStatus.Pending,
+                TenantId = 2,
+                ApplicantNo = applicantNo,
+                Stage = 0,
+                CreationTime = DateTime.Now,
+                IsDeleted = false,
+                RecrtmntJobPostingDetailAuditLogs = new List<RecrtmntJobPostingDetailAuditLog>
+        {
+            new RecrtmntJobPostingDetailAuditLog
+            {
+                Id = Guid.NewGuid(),
+                TenantId = 2,
+                RecrtmntJobPostingDetailId = detailId,
+                Description = $"Applied for the job on {DateTime.Now:d}",
+                CreationTime = DateTime.Now,
+                CreatorUserId = 2,
+                IsDeleted = false
+            }
+        }
+            };
+        }
+
+        private async Task<string> GenerateApplicantNo(applicantdataDto applyDto)
+        {
+            var applicantCount = await _dbContext.RecrtmntJobPostingDetails
+                .CountAsync(x => x.RecrtmntJobPostingHeaderId == applyDto.jobPostingId);
+
+            return $"AN-{applicantCount + 1:D4}";
+        }
+
+        private ApiResponseMessage<string> CreateErrorResponse(string errorMessage)
+        {
+            return new ApiResponseMessage<string>
+            {
+                Data = null,
+                IsSuccess = false,
+                ErrorMessage = errorMessage
+            };
         }
     }
 }
