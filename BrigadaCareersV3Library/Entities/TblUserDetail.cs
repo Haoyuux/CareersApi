@@ -35,15 +35,7 @@ public partial class TblUserDetail
 
     public Guid UserId { get; set; }
 
-    public Guid? UserProfileImageId { get; set; }
-
-    public Guid? CoverPhotoImageId { get; set; }
-
-    public Guid? ResumeId { get; set; }
-
-    public virtual TblAppbinary? CoverPhotoImage { get; set; }
-
-    public virtual TblAppbinary? Resume { get; set; }
+    public virtual ICollection<TblAppbinary> TblAppbinaries { get; set; } = new List<TblAppbinary>();
 
     public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
 
@@ -56,6 +48,4 @@ public partial class TblUserDetail
     public virtual ICollection<TblUserResume> TblUserResumes { get; set; } = new List<TblUserResume>();
 
     public virtual ICollection<TblWorkExperience> TblWorkExperiences { get; set; } = new List<TblWorkExperience>();
-
-    public virtual TblAppbinary? UserProfileImage { get; set; }
 }

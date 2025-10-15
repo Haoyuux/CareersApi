@@ -7,9 +7,17 @@ public partial class TblAppbinary
 {
     public Guid Id { get; set; }
 
+    public Guid? UserId { get; set; }
+
+    public string? S3key { get; set; }
+
     public string FileName { get; set; } = null!;
 
-    public byte[] Byte { get; set; } = null!;
+    public long? FilzeSize { get; set; }
+
+    public int? FileType { get; set; }
+
+    public byte[]? Byte { get; set; }
 
     public DateTime DateUpload { get; set; }
 
@@ -23,13 +31,9 @@ public partial class TblAppbinary
 
     public virtual ICollection<TblCertificate> TblCertificates { get; set; } = new List<TblCertificate>();
 
-    public virtual ICollection<TblUserDetail> TblUserDetailCoverPhotoImages { get; set; } = new List<TblUserDetail>();
-
-    public virtual ICollection<TblUserDetail> TblUserDetailResumes { get; set; } = new List<TblUserDetail>();
-
-    public virtual ICollection<TblUserDetail> TblUserDetailUserProfileImages { get; set; } = new List<TblUserDetail>();
-
     public virtual ICollection<TblUserRequirement> TblUserRequirements { get; set; } = new List<TblUserRequirement>();
 
     public virtual ICollection<TblUserResume> TblUserResumes { get; set; } = new List<TblUserResume>();
+
+    public virtual TblUserDetail? User { get; set; }
 }

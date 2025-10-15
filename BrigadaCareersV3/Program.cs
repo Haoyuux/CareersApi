@@ -1,3 +1,6 @@
+using Amazon.S3;
+using Amazon;
+using BrigadaCareersV3Library.Amazon;
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.AuthServices;
 using BrigadaCareersV3Library.Entities;
@@ -6,44 +9,79 @@ using JobPostingLibrary.HrmsServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
-// ?? add this
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers + System.Text.Json enum serialization as strings
+// ---------------------------------------
+// Controllers and JSON enum serialization
+// ---------------------------------------
 builder.Services
     .AddControllers()
     .AddJsonOptions(o =>
     {
-        // Makes enums serialize as their names (e.g., "Pending"), not integers.
         o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSession();
 
-// Swagger (Swashbuckle)
+// ---------------------------------------
+// Swagger / API explorer
+// ---------------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// DbContexts
+// ---------------------------------------
+// Database contexts
+// ---------------------------------------
 builder.Services.AddDbContext<ApplicationDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultCon")));
+
 builder.Services.AddDbContext<BrigadaCareersDbv3Context>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultCon")));
+
 builder.Services.AddDbContext<PreProdHrmsParallelContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("HrmsConnection")));
 
+// ---------------------------------------
+// Dependency injection for application services
+// ---------------------------------------
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddScoped<IHrmsService, HrmsService>();
 builder.Services.AddMemoryCache();
 
-// Identity
+// ---------------------------------------
+// AWS + S3 configuration
+// ---------------------------------------
+
+// Load AWS settings from appsettings.json
+builder.Services.Configure<AwsSettings>(
+    builder.Configuration.GetSection("AwsSettings")
+);
+
+// Register AWS S3 client
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var awsSettings = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
+    var config = new AmazonS3Config
+    {
+        RegionEndpoint = RegionEndpoint.GetBySystemName(awsSettings.Region)
+    };
+    return new AmazonS3Client(awsSettings.AccessKey, awsSettings.SecretKey, config);
+});
+
+// Register S3 service for DI
+builder.Services.AddScoped<S3AmazonServices>();
+
+// ---------------------------------------
+// ASP.NET Identity configuration
+// ---------------------------------------
 builder.Services.AddIdentity<ApplicationIdentityUser, IdentityRole>(options =>
 {
     options.Password.RequiredLength = 6;
@@ -59,7 +97,9 @@ builder.Services.AddIdentity<ApplicationIdentityUser, IdentityRole>(options =>
 .AddDefaultTokenProviders()
 .AddTokenProvider("userIdentity", typeof(DataProtectorTokenProvider<ApplicationIdentityUser>));
 
-// JWT
+// ---------------------------------------
+// JWT configuration
+// ---------------------------------------
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -80,7 +120,8 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["JWT:ValidAudience"],
         ValidIssuer = builder.Configuration["JWT:ValidIssuer"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecreteKey"]!)),
+            Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecreteKey"]!)
+        ),
         NameClaimType = ClaimTypes.NameIdentifier,
         RoleClaimType = ClaimTypes.Role
     };
@@ -105,42 +146,51 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// ---------------------------------------
 // CORS
+// ---------------------------------------
 builder.Services.AddCors(o => o.AddPolicy("AllowSpa", p =>
-    p.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+    p.WithOrigins("http://localhost:4200")
+     .AllowAnyHeader()
+     .AllowAnyMethod()
+     .AllowCredentials()
 ));
 
-// NSwag document (optional, you already consume it via nswag.json/useDocumentProvider)
+// Optional extra policy
+builder.Services.AddCors(o => o.AddPolicy("front", p =>
+    p.WithOrigins("https://localhost:44381", "https://localhost:44381")
+     .AllowAnyHeader()
+     .AllowAnyMethod()
+     .AllowCredentials()
+));
+
+// ---------------------------------------
+// NSwag / OpenAPI
+// ---------------------------------------
 builder.Services.AddOpenApiDocument(config =>
 {
     config.Title = "BrigadaCareers API";
     config.Description = "API documentation for BrigadaCareers using NSwag.";
     config.Version = "v3";
-
-    // NSwag uses NJsonSchema with System.Text.Json; it will honor the JsonStringEnumConverter above.
-    // If you ever need to force it at the document layer, you can also do:
-    // if (config.SchemaGenerator.Settings is NJsonSchema.Generation.SystemTextJsonSchemaGeneratorSettings stj)
-    // {
-    //     stj.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    // }
 });
 
+// ---------------------------------------
+// HTTP clients
+// ---------------------------------------
 builder.Services.AddHttpClient("nominatim", client =>
 {
     client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
-    client.DefaultRequestHeaders.UserAgent
-          .ParseAdd("BrigadaCareers/1.0 (mercadoblaise@gmail.com)");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("BrigadaCareers/1.0 (mercadoblaise@gmail.com)");
 });
 
-// Optional extra CORS policy
-builder.Services.AddCors(o => o.AddPolicy("front", p => p
-    .WithOrigins("https://localhost:44381", "https://localhost:44381")
-    .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
-));
-
+// ---------------------------------------
+// Build application
+// ---------------------------------------
 var app = builder.Build();
 
-// Pipeline
+// ---------------------------------------
+// Middleware pipeline
+// ---------------------------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -155,7 +205,6 @@ else
 }
 
 app.UseHsts();
-app.UseDeveloperExceptionPage();
 app.UseHttpsRedirection();
 
 app.UseRouting();

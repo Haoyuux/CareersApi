@@ -1,4 +1,5 @@
-﻿using BrigadaCareersV3Library.ApiResponseMessage;
+﻿using BrigadaCareersV3Library.Amazon;
+using BrigadaCareersV3Library.ApiResponseMessage;
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.Enums;
@@ -28,6 +29,7 @@ namespace BrigadaCareersV3Library.AuthServices
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ApplicationDbContext _identityDb;
         private readonly PreProdHrmsParallelContext _dbContext;
+        private readonly S3AmazonServices _s3Service;
 
         private const string RefreshLoginProvider = "userIdentity";
         private const string RefreshTokenName = "refresh_token";
@@ -39,7 +41,8 @@ namespace BrigadaCareersV3Library.AuthServices
             BrigadaCareersDbv3Context appContext,
             IHttpContextAccessor httpContextAccessor,
             ApplicationDbContext identityDb,
-            PreProdHrmsParallelContext dbContext)
+            PreProdHrmsParallelContext dbContext,
+            S3AmazonServices s3Service)
         {
             _userManager = userManager;
             _roleManager = roleManager;
@@ -48,6 +51,7 @@ namespace BrigadaCareersV3Library.AuthServices
             _httpContextAccessor = httpContextAccessor;
             _identityDb = identityDb;
             _dbContext = dbContext;
+            _s3Service = s3Service;
         }
 
         public async Task<string> RegisteredUser(UserDto register)
@@ -408,44 +412,34 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                var appBinaryProfile = userDetails.UserProfileImageId.HasValue
-                    ? await _appContext.TblAppbinaries
-                        .FirstOrDefaultAsync(a => a.Id == userDetails.UserProfileImageId.Value)
-                    : null;
+                // 🔹 Fetch profile, cover, and resume files (if any)
+                var appBinaryProfile = await _s3Service.GetUserFileByTypeAsync(userDetails.Id, FileTypeEnum.ProfileImage);
+                var appBinaryCover = await _s3Service.GetUserFileByTypeAsync(userDetails.Id, FileTypeEnum.CoverImage);
+                var appBinaryResume = await _s3Service.GetUserFileByTypeAsync(userDetails.Id, FileTypeEnum.Resume);
 
-                var appBinaryCover = userDetails.CoverPhotoImageId.HasValue
-                    ? await _appContext.TblAppbinaries
-                        .FirstOrDefaultAsync(a => a.Id == userDetails.CoverPhotoImageId!.Value)
-                    : null;
+                // 🔹 Resolve S3 URLs
+                var profileUrl = appBinaryProfile != null ? _s3Service.GetFileUrl(appBinaryProfile.S3key!) : null;
+                var coverUrl = appBinaryCover != null ? _s3Service.GetFileUrl(appBinaryCover.S3key!) : null;
+                var resumeUrl = appBinaryResume != null ? _s3Service.GetFileUrl(appBinaryResume.S3key!) : null;
 
-                var appBinaryResume = userDetails.ResumeId.HasValue
-                    ? await _appContext.TblAppbinaries
-                        .FirstOrDefaultAsync(a => a.Id == userDetails.ResumeId!.Value)
-                    : null;
-
-                //var getgends = await _dbContext.Hr201genders.ToListAsync();
-
+                // 🔹 Optional: fetch lookup values for gender and civil status
                 var gender = userDetails.Hr201GenderId.HasValue
-                    ? await _dbContext.Hr201genders
-                        .FirstOrDefaultAsync(g => g.Id == userDetails.Hr201GenderId.Value)
+                    ? await _dbContext.Hr201genders.FirstOrDefaultAsync(g => g.Id == userDetails.Hr201GenderId.Value)
                     : null;
 
                 var civilStatus = userDetails.Hr201CivilStatus.HasValue
-                    ? await _dbContext.Hr201civilStatuses
-                        .FirstOrDefaultAsync(cs => cs.Id == userDetails.Hr201CivilStatus.Value)
+                    ? await _dbContext.Hr201civilStatuses.FirstOrDefaultAsync(cs => cs.Id == userDetails.Hr201CivilStatus.Value)
                     : null;
 
+                // 🔹 Construct user DTO
                 var getDetails = new UserDto
                 {
                     Id = Guid.Parse(user.Id),
                     FirstName = userDetails.FirstName,
                     LastName = userDetails.LastName,
-                    Email = user.Email,
                     MiddleName = userDetails.MiddleName,
                     ContactNo = userDetails.ContactNo,
-                    UserProfileByte = appBinaryProfile?.Byte,
-                    UserCoverPhotoByte = appBinaryCover?.Byte,
-                    UserResumeByte = appBinaryResume?.Byte,
+                    Email = user.Email,
                     Hr201GenderId = userDetails.Hr201GenderId,
                     Hr201CivilStatusId = userDetails.Hr201CivilStatus,
                     Gender = gender?.Name,
@@ -454,6 +448,11 @@ namespace BrigadaCareersV3Library.AuthServices
                     Address = userDetails.Address,
                     StreetDetails = userDetails.StreetDetails,
                     AboutMe = userDetails.AboutMe,
+
+                    // ✅ Attach URLs here
+                    UserProfileImage = profileUrl,
+                    UserCoverPhotoImage = coverUrl,
+                    UserResumeFile = resumeUrl
                 };
 
                 return new ApiResponseMessage<UserDto>
@@ -473,6 +472,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
+
         public async Task<GetCurrentUserIdAsyncDto> GetCurrentUserIdAsync()
         {
             var httpContext = _httpContextAccessor.HttpContext
@@ -520,15 +520,104 @@ namespace BrigadaCareersV3Library.AuthServices
 
             return joinUserDetails;
         }
+        //public async Task<ApiResponseMessage<string>> InsertOrUpdateUserCoverPhoto(InsertOrUpdateUserCoverPhotoDto input)
+        //{
+        //    var response = new ApiResponseMessage<string>();
+
+        //    try
+        //    {
+        //        //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+        //        var currentUser = await GetCurrentUserIdAsync();
+
+
+        //        var userDetails = await _appContext.TblUserDetails
+        //            .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+        //        if (userDetails == null)
+        //        {
+        //            response.Data = null;
+        //            response.IsSuccess = false;
+        //            response.ErrorMessage = "User not found";
+        //            return response;
+        //        }
+
+        //        var hasNewImage = !string.IsNullOrEmpty(input.CoverImageBase64);
+
+        //        // 1) Remove only
+        //        if (input.RemoveCoverImage && !hasNewImage)
+        //        {
+        //            if (userDetails.CoverPhotoImageId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
+        //                userDetails.CoverPhotoImageId = null;
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+
+        //            response.Data = "Removed";
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+        //        // 2) Replace / 3) Insert or Update
+        //        if (hasNewImage)
+        //        {
+        //            if (input.RemoveCoverImage && userDetails.CoverPhotoImageId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
+        //                userDetails.UserProfileImageId = null;
+        //            }
+
+        //            if (userDetails.CoverPhotoImageId == null)
+        //            {
+        //                var newId = await UploadNewProfileImageAsync(
+        //                    input.CoverImageBase64,
+        //                    input.CoverImageFileName,
+        //                    input.CoverImageContentType,
+        //                    "User Profile Cover " + currentUser.FirstName
+        //                    );
+
+        //                userDetails.CoverPhotoImageId = newId;
+        //                response.Data = "Inserted";
+        //            }
+        //            else
+        //            {
+        //                await UpdateProfileImageAsync(
+        //                    userDetails.CoverPhotoImageId.Value,
+        //                    input.CoverImageBase64,
+        //                    input.CoverImageFileName,
+        //                    input.CoverImageContentType,
+        //                    "User Cover Image " + currentUser.FirstName
+
+        //                    );
+
+        //                response.Data = input.RemoveCoverImage ? "Replaced" : "Updated";
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+
+        //        response.Data = "No changes";
+        //        response.IsSuccess = true;
+        //        return response;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        response.Data = null;
+        //        response.IsSuccess = false;
+        //        response.ErrorMessage = ex.Message;
+        //        return response;
+        //    }
+        //}
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserCoverPhoto(InsertOrUpdateUserCoverPhotoDto input)
         {
             var response = new ApiResponseMessage<string>();
-
             try
             {
-                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
                 var currentUser = await GetCurrentUserIdAsync();
-
 
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
@@ -543,16 +632,19 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 var hasNewImage = !string.IsNullOrEmpty(input.CoverImageBase64);
 
+                // Get existing cover image
+                var existingCoverImage = await _s3Service.GetUserFileByTypeAsync(
+                    userDetails.UserId,
+                    FileTypeEnum.CoverImage
+                );
+
                 // 1) Remove only
                 if (input.RemoveCoverImage && !hasNewImage)
                 {
-                    if (userDetails.CoverPhotoImageId.HasValue)
+                    if (existingCoverImage != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
-                        userDetails.CoverPhotoImageId = null;
+                        await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId);
                     }
-
-                    await _appContext.SaveChangesAsync();
 
                     response.Data = "Removed";
                     response.IsSuccess = true;
@@ -562,43 +654,35 @@ namespace BrigadaCareersV3Library.AuthServices
                 // 2) Replace / 3) Insert or Update
                 if (hasNewImage)
                 {
-                    if (input.RemoveCoverImage && userDetails.CoverPhotoImageId.HasValue)
+                    bool isNewImage = existingCoverImage == null;
+
+                    // Delete old image if exists (for both replace and update)
+                    if (existingCoverImage != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.CoverPhotoImageId.Value);
-                        userDetails.UserProfileImageId = null;
+                        try
+                        {
+                            await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId);
+                        }
+                        catch
+                        {
+                            // Log error but continue with upload
+                        }
                     }
 
-                    if (userDetails.CoverPhotoImageId == null)
-                    {
-                        var newId = await UploadNewProfileImageAsync(
-                            input.CoverImageBase64,
-                            input.CoverImageFileName,
-                            input.CoverImageContentType,
-                            "User Profile Cover " + currentUser.FirstName
-                            );
+                    // Upload new cover image
+                    await _s3Service.UploadFileAsync(
+                        base64Data: input.CoverImageBase64,
+                        fileName: input.CoverImageFileName ?? "cover-image.jpg",
+                        contentType: input.CoverImageContentType ?? "image/jpeg",
+                        fileType: FileTypeEnum.CoverImage,
+                        userId: userDetails.Id,
+                        description: $"Cover Photo for {userDetails.FirstName} {userDetails.LastName}"
+                    );
 
-                        userDetails.CoverPhotoImageId = newId;
-                        response.Data = "Inserted";
-                    }
-                    else
-                    {
-                        await UpdateProfileImageAsync(
-                            userDetails.CoverPhotoImageId.Value,
-                            input.CoverImageBase64,
-                            input.CoverImageFileName,
-                            input.CoverImageContentType,
-                            "User Cover Image " + currentUser.FirstName
-
-                            );
-
-                        response.Data = input.RemoveCoverImage ? "Replaced" : "Updated";
-                    }
-
-                    await _appContext.SaveChangesAsync();
+                    response.Data = isNewImage ? "Inserted" : (input.RemoveCoverImage ? "Replaced" : "Updated");
                     response.IsSuccess = true;
                     return response;
                 }
-
 
                 response.Data = "No changes";
                 response.IsSuccess = true;
@@ -612,15 +696,104 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
+        //public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
+        //{
+        //    var response = new ApiResponseMessage<string>();
+
+        //    try
+        //    {
+        //        //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+        //        var currentUser = await GetCurrentUserIdAsync();
+
+
+        //        var userDetails = await _appContext.TblUserDetails
+        //            .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+        //        if (userDetails == null)
+        //        {
+        //            response.Data = null;
+        //            response.IsSuccess = false;
+        //            response.ErrorMessage = "User not found";
+        //            return response;
+        //        }
+
+        //        var hasNewImage = !string.IsNullOrEmpty(input.ProfileImageBase64);
+
+        //        // 1) Remove only
+        //        if (input.RemoveProfileImage && !hasNewImage)
+        //        {
+        //            if (userDetails.UserProfileImageId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
+        //                userDetails.UserProfileImageId = null;
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+
+        //            response.Data = "Removed";
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+        //        // 2) Replace / 3) Insert or Update
+        //        if (hasNewImage)
+        //        {
+        //            if (input.RemoveProfileImage && userDetails.UserProfileImageId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
+        //                userDetails.UserProfileImageId = null;
+        //            }
+
+        //            if (userDetails.UserProfileImageId == null)
+        //            {
+        //                var newId = await UploadNewProfileImageAsync(
+        //                    input.ProfileImageBase64,
+        //                    input.ProfileImageFileName,
+        //                    input.ProfileImageContentType,
+        //                    "User Profile Image " + currentUser.FirstName
+        //                    );
+
+        //                userDetails.UserProfileImageId = newId;
+        //                response.Data = "Inserted";
+        //            }
+        //            else
+        //            {
+        //                await UpdateProfileImageAsync(
+        //                    userDetails.UserProfileImageId.Value,
+        //                    input.ProfileImageBase64,
+        //                    input.ProfileImageFileName,
+        //                    input.ProfileImageContentType,
+        //                    "User Profile Image " + currentUser.FirstName
+
+        //                    );
+
+        //                response.Data = input.RemoveProfileImage ? "Replaced" : "Updated";
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+
+        //        response.Data = "No changes";
+        //        response.IsSuccess = true;
+        //        return response;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        response.Data = null;
+        //        response.IsSuccess = false;
+        //        response.ErrorMessage = ex.Message;
+        //        return response;
+        //    }
+        //}
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserProfile(InsertOrUpdateUserProfileDto input)
         {
             var response = new ApiResponseMessage<string>();
-
             try
             {
-                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
                 var currentUser = await GetCurrentUserIdAsync();
-   
 
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
@@ -635,16 +808,19 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 var hasNewImage = !string.IsNullOrEmpty(input.ProfileImageBase64);
 
+                // Get existing profile image
+                var existingProfileImage = await _s3Service.GetUserFileByTypeAsync(
+                    userDetails.UserId,
+                    FileTypeEnum.ProfileImage
+                );
+
                 // 1) Remove only
                 if (input.RemoveProfileImage && !hasNewImage)
                 {
-                    if (userDetails.UserProfileImageId.HasValue)
+                    if (existingProfileImage != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
-                        userDetails.UserProfileImageId = null;
+                        await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId);
                     }
-
-                    await _appContext.SaveChangesAsync();
 
                     response.Data = "Removed";
                     response.IsSuccess = true;
@@ -654,44 +830,36 @@ namespace BrigadaCareersV3Library.AuthServices
                 // 2) Replace / 3) Insert or Update
                 if (hasNewImage)
                 {
-                    if (input.RemoveProfileImage && userDetails.UserProfileImageId.HasValue)
+                    bool isNewImage = existingProfileImage == null;
+
+                    // Delete old image if exists (for both replace and update)
+                    if (existingProfileImage != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.UserProfileImageId.Value);
-                        userDetails.UserProfileImageId = null;
+                        try
+                        {
+                            await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId);
+                        }
+                        catch
+                        {
+                            // Log error but continue with upload
+                        }
                     }
 
-                    if (userDetails.UserProfileImageId == null)
-                    {
-                        var newId = await UploadNewProfileImageAsync(
-                            input.ProfileImageBase64,
-                            input.ProfileImageFileName,
-                            input.ProfileImageContentType,
-                            "User Profile Image " + currentUser.FirstName
-                            );
+                    // Upload new image
+                    await _s3Service.UploadFileAsync(
+                        base64Data: input.ProfileImageBase64,
+                        fileName: input.ProfileImageFileName ?? "profile-image.jpg",
+                        contentType: input.ProfileImageContentType ?? "image/jpeg",
+                        fileType: FileTypeEnum.ProfileImage,
+                        userId: userDetails.Id,
+                        description: $"Profile Image for {userDetails.FirstName} {userDetails.LastName}"
+                    );
 
-                        userDetails.UserProfileImageId = newId;
-                        response.Data = "Inserted";
-                    }
-                    else
-                    {
-                        await UpdateProfileImageAsync(
-                            userDetails.UserProfileImageId.Value,
-                            input.ProfileImageBase64,
-                            input.ProfileImageFileName,
-                            input.ProfileImageContentType,
-                            "User Profile Image " + currentUser.FirstName
-
-                            );
-
-                        response.Data = input.RemoveProfileImage ? "Replaced" : "Updated";
-                    }
-
-                    await _appContext.SaveChangesAsync();
+                    response.Data = isNewImage ? "Inserted" : (input.RemoveProfileImage ? "Replaced" : "Updated");
                     response.IsSuccess = true;
                     return response;
                 }
 
-             
                 response.Data = "No changes";
                 response.IsSuccess = true;
                 return response;
@@ -704,15 +872,105 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
+        //public async Task<ApiResponseMessage<string>> InsertOrUpdateUserResume(InsertOrUpdateUserResumeDto input)
+        //{
+        //    var response = new ApiResponseMessage<string>();
+
+        //    try
+        //    {
+        //        //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
+        //        var currentUser = await GetCurrentUserIdAsync();
+
+
+        //        var userDetails = await _appContext.TblUserDetails
+        //            .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+        //        if (userDetails == null)
+        //        {
+        //            response.Data = null;
+        //            response.IsSuccess = false;
+        //            response.ErrorMessage = "User not found";
+        //            return response;
+        //        }
+
+        //        var hasNewImage = !string.IsNullOrEmpty(input.UserResumeBase64);
+
+        //        // 1) Remove only
+        //        if (input.RemoveUserResume && !hasNewImage)
+        //        {
+        //            if (userDetails.ResumeId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
+        //                userDetails.ResumeId = null;
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+
+        //            response.Data = "Removed";
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+        //        // 2) Replace / 3) Insert or Update
+        //        if (hasNewImage)
+        //        {
+        //            if (input.RemoveUserResume && userDetails.ResumeId.HasValue)
+        //            {
+        //                await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
+        //                userDetails.ResumeId = null;
+        //            }
+
+        //            if (userDetails.ResumeId == null)
+        //            {
+        //                var newId = await UploadNewProfileImageAsync(
+        //                    input.UserResumeBase64,
+        //                    input.UserResumeFileName,
+        //                    input.UserResumeContentType,
+        //                    "User Resume " + currentUser.FirstName
+        //                    );
+
+        //                userDetails.ResumeId = newId;
+        //                response.Data = "Inserted";
+        //            }
+        //            else
+        //            {
+        //                await UpdateProfileImageAsync(
+        //                    userDetails.ResumeId.Value,
+        //                    input.UserResumeBase64,
+        //                    input.UserResumeFileName,
+        //                    input.UserResumeContentType,
+        //                    "User Resume "+ currentUser.FirstName
+
+        //                    );
+
+        //                response.Data = input.RemoveUserResume ? "Replaced" : "Updated";
+        //            }
+
+        //            await _appContext.SaveChangesAsync();
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+
+        //        response.Data = "No changes";
+        //        response.IsSuccess = true;
+        //        return response;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        response.Data = null;
+        //        response.IsSuccess = false;
+        //        response.ErrorMessage = ex.Message;
+        //        return response;
+        //    }
+        //}
         public async Task<ApiResponseMessage<string>> InsertOrUpdateUserResume(InsertOrUpdateUserResumeDto input)
         {
             var response = new ApiResponseMessage<string>();
 
             try
             {
-                //var currentUserId = "1b1e846a-fe12-42f3-8448-1ac60cbbc0a7";
                 var currentUser = await GetCurrentUserIdAsync();
-
 
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
@@ -725,65 +983,61 @@ namespace BrigadaCareersV3Library.AuthServices
                     return response;
                 }
 
-                var hasNewImage = !string.IsNullOrEmpty(input.UserResumeBase64);
+                var hasNewResume = !string.IsNullOrEmpty(input.UserResumeBase64);
+
+                // Get existing resume from appbinary table
+                var existingResume = await _s3Service.GetUserFileByTypeAsync(
+                    userDetails.UserId,
+                    FileTypeEnum.Resume
+                );
 
                 // 1) Remove only
-                if (input.RemoveUserResume && !hasNewImage)
+                if (input.RemoveUserResume && !hasNewResume)
                 {
-                    if (userDetails.ResumeId.HasValue)
+                    if (existingResume != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.ResumeId!.Value);
-                        userDetails.ResumeId = null;
+                        await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId);
                     }
-
-                    await _appContext.SaveChangesAsync();
 
                     response.Data = "Removed";
                     response.IsSuccess = true;
                     return response;
                 }
 
-                // 2) Replace / 3) Insert or Update
-                if (hasNewImage)
+                // 2) Replace or 3) Insert / Update
+                if (hasNewResume)
                 {
-                    if (input.RemoveUserResume && userDetails.ResumeId.HasValue)
+                    bool isNewResume = existingResume == null;
+
+                    // Delete old file (replace/update case)
+                    if (existingResume != null)
                     {
-                        await SoftDeleteBinaryAsync(userDetails.ResumeId.Value);
-                        userDetails.ResumeId = null;
+                        try
+                        {
+                            await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId);
+                        }
+                        catch
+                        {
+                            // swallow deletion errors to avoid blocking upload
+                        }
                     }
 
-                    if (userDetails.ResumeId == null)
-                    {
-                        var newId = await UploadNewProfileImageAsync(
-                            input.UserResumeBase64,
-                            input.UserResumeFileName,
-                            input.UserResumeContentType,
-                            "User Resume " + currentUser.FirstName
-                            );
+                    // Upload new resume
+                    await _s3Service.UploadFileAsync(
+                        base64Data: input.UserResumeBase64,
+                        fileName: input.UserResumeFileName ?? "resume.pdf",
+                        contentType: input.UserResumeContentType ?? "application/pdf",
+                        fileType: FileTypeEnum.Resume,
+                        userId: userDetails.Id,
+                        description: $"Resume file for {userDetails.FirstName} {userDetails.LastName}"
+                    );
 
-                        userDetails.ResumeId = newId;
-                        response.Data = "Inserted";
-                    }
-                    else
-                    {
-                        await UpdateProfileImageAsync(
-                            userDetails.ResumeId.Value,
-                            input.UserResumeBase64,
-                            input.UserResumeFileName,
-                            input.UserResumeContentType,
-                            "User Resume "+ currentUser.FirstName
-
-                            );
-
-                        response.Data = input.RemoveUserResume ? "Replaced" : "Updated";
-                    }
-
-                    await _appContext.SaveChangesAsync();
+                    response.Data = isNewResume ? "Inserted" : (input.RemoveUserResume ? "Replaced" : "Updated");
                     response.IsSuccess = true;
                     return response;
                 }
 
-
+                // No new data, no deletion
                 response.Data = "No changes";
                 response.IsSuccess = true;
                 return response;
@@ -796,6 +1050,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
+
         private async Task<Guid> UploadNewProfileImageAsync(string base64Data, string fileName, string contentType, string description)
         {
             try

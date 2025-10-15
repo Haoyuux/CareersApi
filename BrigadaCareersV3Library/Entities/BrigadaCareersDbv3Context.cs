@@ -130,6 +130,13 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.Description).IsUnicode(false);
             entity.Property(e => e.FileName).IsUnicode(false);
             entity.Property(e => e.IsDeleted).HasColumnName("isDeleted");
+            entity.Property(e => e.S3key)
+                .IsUnicode(false)
+                .HasColumnName("S3Key");
+
+            entity.HasOne(d => d.User).WithMany(p => p.TblAppbinaries)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_Tbl_Appbinary_Tbl_UserDetails");
         });
 
         modelBuilder.Entity<TblCertificate>(entity =>
@@ -208,18 +215,6 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.ContactNo).HasMaxLength(50);
             entity.Property(e => e.CreationTime).HasColumnType("datetime");
-
-            entity.HasOne(d => d.CoverPhotoImage).WithMany(p => p.TblUserDetailCoverPhotoImages)
-                .HasForeignKey(d => d.CoverPhotoImageId)
-                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary1");
-
-            entity.HasOne(d => d.Resume).WithMany(p => p.TblUserDetailResumes)
-                .HasForeignKey(d => d.ResumeId)
-                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary2");
-
-            entity.HasOne(d => d.UserProfileImage).WithMany(p => p.TblUserDetailUserProfileImages)
-                .HasForeignKey(d => d.UserProfileImageId)
-                .HasConstraintName("FK_Tbl_UserDetails_Tbl_Appbinary");
         });
 
         modelBuilder.Entity<TblUserRequirement>(entity =>
