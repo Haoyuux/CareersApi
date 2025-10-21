@@ -13,10 +13,9 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
         public string Name { get; set; }
         public string Issuer { get; set; }
         public string Highlights { get; set; }
-        public DateTime DateAchieved { get; set; }
-        public int CertificateType { get; set; }
-        public byte[] UploadFile { get; set; }
-
+        public DateTime? DateAchieved { get; set; }
         public CertificateTypeEnum Type { get; set; }
+        public string ImageUrl { get; set; }  // ✅ Changed from Byte[] to URL
+        public string FileName { get; set; }  // ✅ Add this
     }
 }

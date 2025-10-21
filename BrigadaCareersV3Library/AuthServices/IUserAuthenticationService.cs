@@ -3,6 +3,7 @@ using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.Dto.AuthDto;
 using BrigadaCareersV3Library.Dto.UserDto;
 using JobPostingLibrary.HrmsDtos;
+using Microsoft.AspNetCore.Mvc;
 using static BrigadaCareersV3Library.AuthServices.UserAuthenticationService;
 
 namespace BrigadaCareersV3Library.AuthServices
@@ -39,5 +40,7 @@ namespace BrigadaCareersV3Library.AuthServices
 
         Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input);
         Task<ApiResponseMessage<IList<GetRequirmentsDto>>> GetRequirementsV1();
+
+        Task<ApiResponseMessage<string>> InsertToApplicantMasterList([FromBody] applicantdataDto applyDto);
     }
 }

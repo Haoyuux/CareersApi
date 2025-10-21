@@ -25,7 +25,7 @@ public partial class TblAppbinary
 
     public bool IsDeleted { get; set; }
 
-    public string Description { get; set; } = null!;
+    public string? Description { get; set; }
 
     public DateTime CreationTime { get; set; }
 

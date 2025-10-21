@@ -442,6 +442,24 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(result);
         }
 
+        [HttpPost("InsertToApplicantMasterList")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> InsertToApplicantMasterList([FromBody] applicantdataDto applyDto)
+        {
+            try
+            {
+                var result = await _userAuthentication.InsertToApplicantMasterList(applyDto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
 
     }
 }

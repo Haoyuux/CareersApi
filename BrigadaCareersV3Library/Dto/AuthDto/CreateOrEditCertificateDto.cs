@@ -17,9 +17,9 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
 
         //file
 
-        public string ProfileImageBase64 { get; set; }
-        public string ProfileImageFileName { get; set; }
-        public string ProfileImageContentType { get; set; }
+        public string CertificateImageBase64 { get; set; }
+        public string CertificateImageFileName { get; set; }
+        public string CertificateImageContentType { get; set; }
 
     }
 }

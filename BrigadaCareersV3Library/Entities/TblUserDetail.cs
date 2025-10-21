@@ -7,6 +7,8 @@ public partial class TblUserDetail
 {
     public Guid Id { get; set; }
 
+    public Guid? UserId { get; set; }
+
     public string? FirstName { get; set; }
 
     public string? MiddleName { get; set; }
@@ -32,8 +34,6 @@ public partial class TblUserDetail
     public string? AboutMe { get; set; }
 
     public string? StreetDetails { get; set; }
-
-    public Guid UserId { get; set; }
 
     public virtual ICollection<TblAppbinary> TblAppbinaries { get; set; } = new List<TblAppbinary>();
 

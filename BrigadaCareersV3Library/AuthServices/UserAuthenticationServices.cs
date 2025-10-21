@@ -182,7 +182,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     var userRole = await _userManager.GetRolesAsync(loginUser);
 
                     var accessToken = await GenerateAccessToken(loginUser, userRole);
-                    var newRefreshToken = await GenerateRefreshToken(loginUser); // rotates in DB
+                    var newRefreshToken = await GenerateRefreshToken(loginUser); 
 
                     var userInfo = new UserLoginDto
                     {
@@ -509,7 +509,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 select new GetCurrentUserIdAsyncDto
                 {
                     Id = userdetails.Id,
-                    UserId = userdetails.UserId,
+                    UserId = userdetails.UserId.Value,
                     FirstName = userdetails.FirstName!,
                     LastName = userdetails.LastName!,
                 }
@@ -634,7 +634,7 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 // Get existing cover image
                 var existingCoverImage = await _s3Service.GetUserFileByTypeAsync(
-                    userDetails.UserId,
+                    userDetails.UserId.Value,
                     FileTypeEnum.CoverImage
                 );
 
@@ -643,7 +643,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     if (existingCoverImage != null)
                     {
-                        await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId);
+                        await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId.Value);
                     }
 
                     response.Data = "Removed";
@@ -661,7 +661,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     {
                         try
                         {
-                            await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId);
+                            await _s3Service.DeleteFileAsync(existingCoverImage.Id, userDetails.UserId.Value);
                         }
                         catch
                         {
@@ -810,7 +810,7 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 // Get existing profile image
                 var existingProfileImage = await _s3Service.GetUserFileByTypeAsync(
-                    userDetails.UserId,
+                    userDetails.UserId.Value,
                     FileTypeEnum.ProfileImage
                 );
 
@@ -819,7 +819,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     if (existingProfileImage != null)
                     {
-                        await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId);
+                        await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId.Value);
                     }
 
                     response.Data = "Removed";
@@ -837,7 +837,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     {
                         try
                         {
-                            await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId);
+                            await _s3Service.DeleteFileAsync(existingProfileImage.Id, userDetails.UserId.Value);
                         }
                         catch
                         {
@@ -987,7 +987,7 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 // Get existing resume from appbinary table
                 var existingResume = await _s3Service.GetUserFileByTypeAsync(
-                    userDetails.UserId,
+                    userDetails.UserId.Value,
                     FileTypeEnum.Resume
                 );
 
@@ -996,7 +996,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     if (existingResume != null)
                     {
-                        await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId);
+                        await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId.Value);
                     }
 
                     response.Data = "Removed";
@@ -1014,7 +1014,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     {
                         try
                         {
-                            await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId);
+                            await _s3Service.DeleteFileAsync(existingResume.Id, userDetails.UserId.Value);
                         }
                         catch
                         {
@@ -1377,133 +1377,322 @@ namespace BrigadaCareersV3Library.AuthServices
             }
 
         }
+
         //CERTIFICATE
+
         public async Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input)
         {
-            if (input.Id == Guid.Empty)
+            var response = new ApiResponseMessage<string>();
+
+            try
             {
-                //create
-                try
+                var currentUser = await GetCurrentUserIdAsync();
+
+                // 🔹 Resolve Tbl_UserDetails for current user
+                var userDetails = await _appContext.TblUserDetails
+                    .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+                if (userDetails == null)
                 {
-                    var currentUser = await GetCurrentUserIdAsync();
-                    var insertCert = new TblCertificate
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "User not found";
+                    return response;
+                }
+
+                bool hasNewImage = !string.IsNullOrEmpty(input.CertificateImageBase64);
+                TblCertificate certEntity;
+
+                // -----------------------------
+                // CREATE NEW CERTIFICATE
+                // -----------------------------
+                if (input.Id == Guid.Empty)
+                {
+                    certEntity = new TblCertificate
                     {
                         Id = Guid.NewGuid(),
-                        UserIdFk = currentUser.Id,
+                        UserIdFk = userDetails.Id, // ✅ link to Tbl_UserDetails.Id
                         CreationTime = DateTime.UtcNow,
                         IsDeleted = false,
                         Name = input.Name,
                         Issuer = input.Issuer,
                         Highlights = input.Highlights,
                         DateAchieved = input.DateAchieved,
-                        CertificateType = input.CertificateType,
-                        AttachImgId = await UploadNewProfileImageAsync(
-                            input.ProfileImageBase64,
-                            input.ProfileImageFileName,
-                            input.ProfileImageContentType,
-                            "User Upload Certificate"
-                            )
+                        CertificateType = input.CertificateType
+                    };
 
-                };
-
-                    await _appContext.TblCertificates.AddAsync(insertCert);
+                    await _appContext.TblCertificates.AddAsync(certEntity);
                     await _appContext.SaveChangesAsync();
 
-                    return new ApiResponseMessage<string>
+                    // Upload new certificate image (optional)
+                    if (hasNewImage)
                     {
-                        Data = "Success",
-                        IsSuccess = true,
-                        ErrorMessage = ""
-                    };
+                        await _s3Service.UploadFileAsync(
+                            base64Data: input.CertificateImageBase64,
+                            fileName: input.CertificateImageFileName ?? "certificate.jpg",
+                            contentType: input.CertificateImageContentType ?? "image/jpeg",
+                            fileType: FileTypeEnum.Certificate,
+                            userId: userDetails.Id, // ✅ same FK logic as cover photo
+                            description: $"Certificate: {input.Name} (ID: {certEntity.Id})"
+                        );
+                    }
+
+                    response.Data = "Certificate created successfully";
+                    response.IsSuccess = true;
+                    return response;
                 }
-                catch (Exception ex)
+
+                // -----------------------------
+                // UPDATE EXISTING CERTIFICATE
+                // -----------------------------
+                certEntity = await _appContext.TblCertificates
+                    .FirstOrDefaultAsync(c => c.Id == input.Id && c.UserIdFk == userDetails.Id && !c.IsDeleted);
+
+                if (certEntity == null)
                 {
-
-                    return new ApiResponseMessage<string>
-                    {
-                        Data = "",
-                        IsSuccess = false,
-                        ErrorMessage = ex.Message
-                    };
+                    response.IsSuccess = false;
+                    response.ErrorMessage = "Certificate not found";
+                    return response;
                 }
 
+                // Update basic details
+                certEntity.Name = input.Name;
+                certEntity.Issuer = input.Issuer;
+                certEntity.Highlights = input.Highlights;
+                certEntity.DateAchieved = input.DateAchieved;
+                certEntity.CertificateType = input.CertificateType;
 
+                _appContext.TblCertificates.Update(certEntity);
+                await _appContext.SaveChangesAsync();
+
+                // Handle image replacement
+                if (hasNewImage)
+                {
+                    // Find existing certificate image
+                    var existingImage = await _s3Service.GetUserFileByTypeAsync(
+                        userDetails.UserId.Value,
+                        FileTypeEnum.Certificate
+                    );
+
+                    // Delete old file if exists
+                    if (existingImage != null)
+                    {
+                        try
+                        {
+                            await _s3Service.DeleteFileAsync(existingImage.Id, userDetails.UserId.Value);
+                        }
+                        catch
+                        {
+                            // Ignore delete failure, continue to upload
+                        }
+                    }
+
+                    // Upload new certificate image
+                    await _s3Service.UploadFileAsync(
+                        base64Data: input.CertificateImageBase64,
+                        fileName: input.CertificateImageFileName ?? "certificate.jpg",
+                        contentType: input.CertificateImageContentType ?? "image/jpeg",
+                        fileType: FileTypeEnum.Certificate,
+                        userId: userDetails.Id, // ✅ always Tbl_UserDetails.Id
+                        description: $"Updated certificate: {input.Name} (ID: {certEntity.Id})"
+                    );
+                }
+
+                response.Data = "Certificate updated successfully";
+                response.IsSuccess = true;
+                return response;
             }
-            else
+            catch (Exception ex)
             {
-                //update
+                response.IsSuccess = false;
+                response.ErrorMessage = ex.Message;
+                return response;
             }
-            return null;
         }
+
+
+        //public async Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input)
+        //{
+        //    if (input.Id == Guid.Empty)
+        //    {
+        //        //create
+        //        try
+        //        {
+        //            var currentUser = await GetCurrentUserIdAsync();
+        //            var insertCert = new TblCertificate
+        //            {
+        //                Id = Guid.NewGuid(),
+        //                UserIdFk = currentUser.Id,
+        //                CreationTime = DateTime.UtcNow,
+        //                IsDeleted = false,
+        //                Name = input.Name,
+        //                Issuer = input.Issuer,
+        //                Highlights = input.Highlights,
+        //                DateAchieved = input.DateAchieved,
+        //                CertificateType = input.CertificateType,
+        //                AttachImgId = await UploadNewProfileImageAsync(
+        //                    input.ProfileImageBase64,
+        //                    input.ProfileImageFileName,
+        //                    input.ProfileImageContentType,
+        //                    "User Upload Certificate"
+        //                    )
+
+        //        };
+
+        //            await _appContext.TblCertificates.AddAsync(insertCert);
+        //            await _appContext.SaveChangesAsync();
+
+        //            return new ApiResponseMessage<string>
+        //            {
+        //                Data = "Success",
+        //                IsSuccess = true,
+        //                ErrorMessage = ""
+        //            };
+        //        }
+        //        catch (Exception ex)
+        //        {
+
+        //            return new ApiResponseMessage<string>
+        //            {
+        //                Data = "",
+        //                IsSuccess = false,
+        //                ErrorMessage = ex.Message
+        //            };
+        //        }
+
+
+        //    }
+        //    else
+        //    {
+        //        //update
+        //    }
+        //    return null;
+        //}
         public async Task<ApiResponseMessage<IList<GetUserCertificateDto>>> GetUserCertificate()
-        {
-            var currentUser = await GetCurrentUserIdAsync();
-
-
-            var getUserWorkExp = await 
-                (
-                from cert in _appContext.TblCertificates
-                join appbinary in _appContext.TblAppbinaries on cert.AttachImgId equals appbinary.Id
-                where cert.UserIdFk == currentUser.Id
-                select new GetUserCertificateDto
-                { 
-                    Id = cert.Id,
-                    Name = cert.Name,
-                    Issuer= cert.Issuer,
-                    Highlights = cert.Highlights,
-                    DateAchieved = cert.DateAchieved,
-                    Type = (CertificateTypeEnum)cert.CertificateType,
-                    UploadFile = appbinary.Byte,
-                    
-                }).ToListAsync();
-
-
-            return new ApiResponseMessage<IList<GetUserCertificateDto>>
-            {
-                Data = getUserWorkExp,
-                IsSuccess = true,
-                ErrorMessage = "",
-            };
-        }
-        public async Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId)
         {
             try
             {
-                var apiMessage = "";
-                var getUserCert = await _appContext.TblCertificates.Where(x => x.Id == certificateId).FirstOrDefaultAsync();
+                var currentUser = await GetCurrentUserIdAsync();
 
-                if (getUserCert is null)
+                // Get all user certificates
+                var certificates = await _appContext.TblCertificates
+                    .Where(cert => cert.UserIdFk == currentUser.Id && !cert.IsDeleted)
+                    .OrderByDescending(cert => cert.DateAchieved)
+                    .ToListAsync();
+
+                // Get all certificate images for this user
+                var certificateImages = await _appContext.TblAppbinaries
+                    .Where(ab => ab.UserId == currentUser.UserId
+                              && ab.TypeEnum == (int)FileTypeEnum.Certificate
+                              && !ab.IsDeleted)
+                    .ToListAsync();
+
+                var result = new List<GetUserCertificateDto>();
+
+                foreach (var cert in certificates)
                 {
-                    apiMessage = "";
+                    // For now, match the first available image (or implement better matching logic)
+                    var image = certificateImages.FirstOrDefault();
+
+                    result.Add(new GetUserCertificateDto
+                    {
+                        Id = cert.Id,
+                        Name = cert.Name,
+                        Issuer = cert.Issuer,
+                        Highlights = cert.Highlights,
+                        DateAchieved = cert.DateAchieved,
+                        Type = (CertificateTypeEnum)cert.CertificateType,
+                        ImageUrl = image != null ? _s3Service.GetFileUrl(image.S3key) : null,
+                        FileName = image?.FileName
+                    });
                 }
-                else
+
+                return new ApiResponseMessage<IList<GetUserCertificateDto>>
                 {
-                    _appContext.TblCertificates.Remove(getUserCert!);
-                    await _appContext.SaveChangesAsync();
-
-                    apiMessage = "Success";
-                }
-
-
-
-                return new ApiResponseMessage<string>
-                {
-                    Data = apiMessage,
-                    IsSuccess = !string.IsNullOrWhiteSpace(apiMessage),
-                    ErrorMessage = !string.IsNullOrWhiteSpace(apiMessage) ? "" : "No Data"
+                    Data = result,
+                    IsSuccess = true,
+                    ErrorMessage = ""
                 };
             }
             catch (Exception ex)
             {
+                return new ApiResponseMessage<IList<GetUserCertificateDto>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        public async Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId)
+        {
+            try
+            {
+                var currentUser = await GetCurrentUserIdAsync();
+
+                var certificate = await _appContext.TblCertificates
+                    .FirstOrDefaultAsync(x => x.Id == certificateId && x.UserIdFk == currentUser.Id);
+
+                if (certificate == null)
+                {
+                    return new ApiResponseMessage<string>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "Certificate not found"
+                    };
+                }
+
+                // Delete associated images from S3
+                var certificateImages = await _appContext.TblAppbinaries
+                    .Where(ab => ab.UserId == currentUser.UserId
+                              && ab.TypeEnum == (int)FileTypeEnum.Certificate
+                              && !ab.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var image in certificateImages)
+                {
+                    try
+                    {
+                        // Delete from S3
+                        if (!string.IsNullOrEmpty(image.S3key))
+                        {
+                            await _s3Service.DeleteFileAsync(image.Id, currentUser.UserId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but continue
+                        // _logger.LogWarning($"Failed to delete S3 file: {ex.Message}");
+                    }
+                }
+
+                // Soft delete or hard delete
+                // Option 1: Soft delete (recommended)
+                certificate.IsDeleted = true;
+                _appContext.TblCertificates.Update(certificate);
+
+                // Option 2: Hard delete
+                // _appContext.TblCertificates.Remove(certificate);
+
+                await _appContext.SaveChangesAsync();
 
                 return new ApiResponseMessage<string>
                 {
-                    Data = "",
-                    IsSuccess = false,
-                    ErrorMessage = ex.Message,
+                    Data = "Certificate deleted successfully",
+                    IsSuccess = true,
+                    ErrorMessage = ""
                 };
             }
-
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
+            }
         }
         //SKILLS
         public async Task<ApiResponseMessage<string>> CreateOrEditSkills(CreateOrEditSkillsDto input)
@@ -1820,9 +2009,6 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
-
-
-
         public async Task<ApiResponseMessage<string>> ValidationPrimarySecondary(Guid userId)
         {
             try
