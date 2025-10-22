@@ -17,5 +17,6 @@ namespace JobPostingLibrary.HrmsDtos
         public string Status { get; set; }
         public byte[] filebyte { get; set; }
         public string Name { get; set; }
+        public string ImageUrl { get; set; }
     }
 }

@@ -151,9 +151,9 @@ public partial class BrigadaCareersDbv3Context : DbContext
             entity.Property(e => e.Issuer).IsUnicode(false);
             entity.Property(e => e.Name).IsUnicode(false);
 
-            entity.HasOne(d => d.CertificateTypeNavigation).WithMany(p => p.TblCertificates)
-                .HasForeignKey(d => d.CertificateTypeId)
-                .HasConstraintName("FK_Tbl_Certificate_Tbl_Appbinary1");
+            entity.HasOne(d => d.AppBinary).WithMany(p => p.TblCertificates)
+                .HasForeignKey(d => d.AppBinaryId)
+                .HasConstraintName("FK_Tbl_Certificate_Tbl_Appbinary");
 
             entity.HasOne(d => d.UserIdFkNavigation).WithMany(p => p.TblCertificates)
                 .HasForeignKey(d => d.UserIdFk)

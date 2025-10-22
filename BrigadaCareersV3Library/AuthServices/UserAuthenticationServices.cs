@@ -17,6 +17,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace BrigadaCareersV3Library.AuthServices
 {
@@ -1388,7 +1389,7 @@ namespace BrigadaCareersV3Library.AuthServices
             {
                 var currentUser = await GetCurrentUserIdAsync();
 
-                // 🔹 Resolve Tbl_UserDetails for current user
+                // 🔹 Get user details
                 var userDetails = await _appContext.TblUserDetails
                     .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
 
@@ -1407,34 +1408,36 @@ namespace BrigadaCareersV3Library.AuthServices
                 // -----------------------------
                 if (input.Id == Guid.Empty)
                 {
+                    Guid? uploadedFileId = null;
+
+                    if (hasNewImage)
+                    {
+                        uploadedFileId = await _s3Service.UploadFileAsync(
+                            base64Data: input.CertificateImageBase64,
+                            fileName: input.CertificateImageFileName ?? "certificate.jpg",
+                            contentType: input.CertificateImageContentType ?? "image/jpeg",
+                            fileType: FileTypeEnum.Certificate,
+                            userId: userDetails.Id,
+                            description: $"Certificate: {input.Name}"
+                        );
+                    }
+
                     certEntity = new TblCertificate
                     {
                         Id = Guid.NewGuid(),
-                        UserIdFk = userDetails.Id, // ✅ link to Tbl_UserDetails.Id
+                        UserIdFk = userDetails.Id,
                         CreationTime = DateTime.UtcNow,
                         IsDeleted = false,
                         Name = input.Name,
                         Issuer = input.Issuer,
                         Highlights = input.Highlights,
                         DateAchieved = input.DateAchieved,
-                        CertificateType = input.CertificateType
+                        CertificateType = input.CertificateType,
+                        AppBinaryId = uploadedFileId // ✅ save uploaded file ID
                     };
 
                     await _appContext.TblCertificates.AddAsync(certEntity);
                     await _appContext.SaveChangesAsync();
-
-                    // Upload new certificate image (optional)
-                    if (hasNewImage)
-                    {
-                        await _s3Service.UploadFileAsync(
-                            base64Data: input.CertificateImageBase64,
-                            fileName: input.CertificateImageFileName ?? "certificate.jpg",
-                            contentType: input.CertificateImageContentType ?? "image/jpeg",
-                            fileType: FileTypeEnum.Certificate,
-                            userId: userDetails.Id, // ✅ same FK logic as cover photo
-                            description: $"Certificate: {input.Name} (ID: {certEntity.Id})"
-                        );
-                    }
 
                     response.Data = "Certificate created successfully";
                     response.IsSuccess = true;
@@ -1454,48 +1457,44 @@ namespace BrigadaCareersV3Library.AuthServices
                     return response;
                 }
 
-                // Update basic details
+                // Update fields
                 certEntity.Name = input.Name;
                 certEntity.Issuer = input.Issuer;
                 certEntity.Highlights = input.Highlights;
                 certEntity.DateAchieved = input.DateAchieved;
                 certEntity.CertificateType = input.CertificateType;
 
-                _appContext.TblCertificates.Update(certEntity);
-                await _appContext.SaveChangesAsync();
-
                 // Handle image replacement
                 if (hasNewImage)
                 {
-                    // Find existing certificate image
-                    var existingImage = await _s3Service.GetUserFileByTypeAsync(
-                        userDetails.UserId.Value,
-                        FileTypeEnum.Certificate
-                    );
-
-                    // Delete old file if exists
-                    if (existingImage != null)
+                    // Delete old file if it exists
+                    if (certEntity.AppBinaryId.HasValue)
                     {
                         try
                         {
-                            await _s3Service.DeleteFileAsync(existingImage.Id, userDetails.UserId.Value);
+                            await _s3Service.DeleteFileAsync(certEntity.AppBinaryId.Value, userDetails.UserId.Value);
                         }
                         catch
                         {
-                            // Ignore delete failure, continue to upload
+                            // Ignore delete failure
                         }
                     }
 
                     // Upload new certificate image
-                    await _s3Service.UploadFileAsync(
+                    var newFileId = await _s3Service.UploadFileAsync(
                         base64Data: input.CertificateImageBase64,
                         fileName: input.CertificateImageFileName ?? "certificate.jpg",
                         contentType: input.CertificateImageContentType ?? "image/jpeg",
                         fileType: FileTypeEnum.Certificate,
-                        userId: userDetails.Id, // ✅ always Tbl_UserDetails.Id
-                        description: $"Updated certificate: {input.Name} (ID: {certEntity.Id})"
+                        userId: userDetails.Id,
+                        description: $"Updated certificate: {input.Name}"
                     );
+
+                    certEntity.AppBinaryId = newFileId; 
                 }
+
+                _appContext.TblCertificates.Update(certEntity);
+                await _appContext.SaveChangesAsync();
 
                 response.Data = "Certificate updated successfully";
                 response.IsSuccess = true;
@@ -1508,6 +1507,8 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
+
+
 
 
         //public async Task<ApiResponseMessage<string>> CreateOrEditCertificate(CreateOrEditCertificateDto input)
@@ -1579,38 +1580,47 @@ namespace BrigadaCareersV3Library.AuthServices
                     .OrderByDescending(cert => cert.DateAchieved)
                     .ToListAsync();
 
-                // Get all certificate images for this user
-                var certificateImages = await _appContext.TblAppbinaries
-                    .Where(ab => ab.UserId == currentUser.UserId
-                              && ab.TypeEnum == (int)FileTypeEnum.Certificate
-                              && !ab.IsDeleted)
-                    .ToListAsync();
-
                 var result = new List<GetUserCertificateDto>();
 
-                foreach (var cert in certificates)
+                if (certificates.Any())
                 {
-                    // For now, match the first available image (or implement better matching logic)
-                    var image = certificateImages.FirstOrDefault();
+                
+                    var appbinaryIds = certificates
+                        .Where(c => c.AppBinaryId != null)
+                        .Select(c => c.AppBinaryId.Value)
+                        .ToList();
 
-                    result.Add(new GetUserCertificateDto
+               
+                    var certificateImages = await _appContext.TblAppbinaries
+                        .Where(ab => appbinaryIds.Contains(ab.Id)
+                                  && ab.TypeEnum == (int)FileTypeEnum.Certificate
+                                  && !ab.IsDeleted)
+                        .ToListAsync();
+
+                    foreach (var cert in certificates)
                     {
-                        Id = cert.Id,
-                        Name = cert.Name,
-                        Issuer = cert.Issuer,
-                        Highlights = cert.Highlights,
-                        DateAchieved = cert.DateAchieved,
-                        Type = (CertificateTypeEnum)cert.CertificateType,
-                        ImageUrl = image != null ? _s3Service.GetFileUrl(image.S3key) : null,
-                        FileName = image?.FileName
-                    });
+                        var image = certificateImages.FirstOrDefault(ab => ab.Id == cert.AppBinaryId);
+
+                        result.Add(new GetUserCertificateDto
+                        {
+                            Id = cert.Id,
+                            Name = cert.Name,
+                            Issuer = cert.Issuer,
+                            Highlights = cert.Highlights,
+                            DateAchieved = cert.DateAchieved,
+                            Type = (CertificateTypeEnum)cert.CertificateType,
+                            ImageUrl = image != null ? _s3Service.GetFileUrl(image.S3key) : null,
+                            FileName = image?.FileName,
+                            AppBinaryId = image.Id,
+                        });
+                    }
                 }
 
                 return new ApiResponseMessage<IList<GetUserCertificateDto>>
                 {
                     Data = result,
                     IsSuccess = true,
-                    ErrorMessage = ""
+                    ErrorMessage = string.Empty
                 };
             }
             catch (Exception ex)
@@ -1624,7 +1634,9 @@ namespace BrigadaCareersV3Library.AuthServices
             }
         }
 
-        public async Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId)
+
+
+        public async Task<ApiResponseMessage<string>> DeleteUserCertificate(Guid certificateId, Guid appBinaryID)
         {
             try
             {
@@ -1643,10 +1655,11 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                // Delete associated images from S3
+                // Get all related certificate images
                 var certificateImages = await _appContext.TblAppbinaries
-                    .Where(ab => ab.UserId == currentUser.UserId
+                    .Where(ab => ab.UserId == currentUser.Id
                               && ab.TypeEnum == (int)FileTypeEnum.Certificate
+                              && ab.Id == appBinaryID
                               && !ab.IsDeleted)
                     .ToListAsync();
 
@@ -1654,10 +1667,14 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     try
                     {
-                        // Delete from S3
+                        // Mark as deleted
+                        image.IsDeleted = true;
+
+                        // Delete from S3 (if exists)
                         if (!string.IsNullOrEmpty(image.S3key))
                         {
-                            await _s3Service.DeleteFileAsync(image.Id, currentUser.UserId);
+                            await _s3Service.DeleteFileAsync(image.Id, currentUser.Id);
+
                         }
                     }
                     catch (Exception ex)
@@ -1667,21 +1684,18 @@ namespace BrigadaCareersV3Library.AuthServices
                     }
                 }
 
-                // Soft delete or hard delete
-                // Option 1: Soft delete (recommended)
+                // Soft delete certificate
                 certificate.IsDeleted = true;
                 _appContext.TblCertificates.Update(certificate);
 
-                // Option 2: Hard delete
-                // _appContext.TblCertificates.Remove(certificate);
-
+                // Save changes for both images and certificate
                 await _appContext.SaveChangesAsync();
 
                 return new ApiResponseMessage<string>
                 {
                     Data = "Certificate deleted successfully",
                     IsSuccess = true,
-                    ErrorMessage = ""
+                    ErrorMessage = string.Empty
                 };
             }
             catch (Exception ex)
@@ -1694,6 +1708,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
+
         //SKILLS
         public async Task<ApiResponseMessage<string>> CreateOrEditSkills(CreateOrEditSkillsDto input)
         {
@@ -1803,6 +1818,124 @@ namespace BrigadaCareersV3Library.AuthServices
 
         }
 
+        //public async Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input)
+        //{
+        //    var response = new ApiResponseMessage<string>();
+
+        //    try
+        //    {
+        //        var currentUser = await GetCurrentUserIdAsync();
+
+        //        var userDetails = await _appContext.TblUserDetails
+        //            .FirstOrDefaultAsync(u => u.UserId == currentUser.UserId);
+
+        //        if (userDetails == null)
+        //        {
+        //            response.Data = null;
+        //            response.IsSuccess = false;
+        //            response.ErrorMessage = "User not found";
+        //            return response;
+        //        }
+
+        //        // Find existing requirement for this user + checklist item combination
+        //        var getReq = await _appContext.TblUserRequirements
+        //            .Where(x => x.UserDetailsId == userDetails.Id
+        //                     && x.RecrtmntRequirementChecklistId == input.RecrtmntRequirementCheckListId
+        //                     && !x.IsDeleted)
+        //            .FirstOrDefaultAsync();
+
+        //        var hasNewImage = !string.IsNullOrEmpty(input.UserReqFileBase64);
+
+        //        // 1) Remove only
+        //        if (input.RemoveUserReqFile && !hasNewImage)
+        //        {
+        //            if (getReq != null)
+        //            {
+        //                await SoftDeleteBinaryAsync(getReq.Id);
+        //                getReq.IsDeleted = true;
+        //                await _appContext.SaveChangesAsync();
+
+        //                response.Data = "Removed";
+        //                response.IsSuccess = true;
+        //                return response;
+        //            }
+
+        //            response.Data = "No requirement found to remove";
+        //            response.IsSuccess = true;
+        //            return response;
+        //        }
+
+        //        // 2) Replace / 3) Insert or Update
+        //        if (hasNewImage)
+        //        {
+        //            // If replacing existing requirement
+        //            if (input.RemoveUserReqFile && getReq != null)
+        //            {
+        //                await SoftDeleteBinaryAsync(getReq.Id);
+        //                getReq.IsDeleted = true;
+        //            }
+
+        //            // INSERT: No existing requirement found
+        //            if (getReq == null)
+        //            {
+        //                var newBinaryId = await UploadNewProfileImageAsync(
+        //                    input.UserReqFileBase64,
+        //                    input.UserReqFileName,
+        //                    input.UserReqFileContentType,
+        //                    "User File Requirements " + currentUser.FirstName
+        //                );
+
+        //                var insertUserReq = new TblUserRequirement
+        //                {
+        //                    Id = Guid.NewGuid(),
+        //                    UseReqId = newBinaryId,
+        //                    UserDetailsId = userDetails.Id,
+        //                    RecrtmntRequirementChecklistId = input.RecrtmntRequirementCheckListId,
+        //                    Status = (int)RequirementsStatusEnum.Pending,
+        //                    CreationTime = DateTime.UtcNow,
+        //                    IsDeleted = false,
+        //                };
+
+        //                await _appContext.TblUserRequirements.AddAsync(insertUserReq);
+        //                await _appContext.SaveChangesAsync();
+
+        //                response.Data = "Inserted";
+        //                response.IsSuccess = true;
+        //                return response;
+        //            }
+        //            // UPDATE: Requirement exists
+        //            else
+        //            {
+        //                await UpdateProfileImageAsync(
+        //                    getReq.UseReqId.Value,
+        //                    input.UserReqFileBase64,
+        //                    input.UserReqFileName,
+        //                    input.UserReqFileContentType,
+        //                    "User File Requirements " + currentUser.FirstName
+        //                );
+
+        //                getReq.Status = (int)RequirementsStatusEnum.Pending; // Reset to pending on update
+        //                await _appContext.SaveChangesAsync();
+
+        //                response.Data = input.RemoveUserReqFile ? "Replaced" : "Updated";
+        //                response.IsSuccess = true;
+        //                return response;
+        //            }
+        //        }
+
+        //        response.Data = "No changes";
+        //        response.IsSuccess = true;
+        //        return response;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        response.Data = null;
+        //        response.IsSuccess = false;
+        //        response.ErrorMessage = ex.Message;
+        //        return response;
+        //    }
+        //}
+
         public async Task<ApiResponseMessage<string>> CreateOrUpdateReqSubmission(CreateOrUpdateReqSubmissionDto input)
         {
             var response = new ApiResponseMessage<string>();
@@ -1831,12 +1964,16 @@ namespace BrigadaCareersV3Library.AuthServices
 
                 var hasNewImage = !string.IsNullOrEmpty(input.UserReqFileBase64);
 
-                // 1) Remove only
+                // ✅ 1) Remove only
                 if (input.RemoveUserReqFile && !hasNewImage)
                 {
                     if (getReq != null)
                     {
-                        await SoftDeleteBinaryAsync(getReq.Id);
+                        // Soft delete existing binary + record
+                        if (getReq.UseReqId.HasValue)
+                        {
+                            await SoftDeleteBinaryAsync(getReq.UseReqId.Value);
+                        }
                         getReq.IsDeleted = true;
                         await _appContext.SaveChangesAsync();
 
@@ -1850,30 +1987,36 @@ namespace BrigadaCareersV3Library.AuthServices
                     return response;
                 }
 
-                // 2) Replace / 3) Insert or Update
+                // ✅ 2) Replace / 3) Insert or Update
                 if (hasNewImage)
                 {
-                    // If replacing existing requirement
-                    if (input.RemoveUserReqFile && getReq != null)
+                    // If replacing existing requirement, delete old binary
+                    if (input.RemoveUserReqFile && getReq != null && getReq.UseReqId.HasValue)
                     {
-                        await SoftDeleteBinaryAsync(getReq.Id);
-                        getReq.IsDeleted = true;
+                        await SoftDeleteBinaryAsync(getReq.UseReqId.Value);
                     }
+
+                    // Prepare upload to S3
+                    var fileName = input.UserReqFileName ?? "requirement-file.jpg";
+                    var contentType = input.UserReqFileContentType ?? "image/jpeg";
+
+                    // Upload to S3 and get the TblAppbinary ID
+                    var uploadedFileId = await _s3Service.UploadFileAsync(
+                        base64Data: input.UserReqFileBase64,
+                        fileName: fileName,
+                        contentType: contentType,
+                        fileType: FileTypeEnum.Attachment,
+                        userId: userDetails.Id,
+                        description: $"Requirement: {fileName}"
+                    );
 
                     // INSERT: No existing requirement found
                     if (getReq == null)
                     {
-                        var newBinaryId = await UploadNewProfileImageAsync(
-                            input.UserReqFileBase64,
-                            input.UserReqFileName,
-                            input.UserReqFileContentType,
-                            "User File Requirements " + currentUser.FirstName
-                        );
-
                         var insertUserReq = new TblUserRequirement
                         {
                             Id = Guid.NewGuid(),
-                            UseReqId = newBinaryId,
+                            UseReqId = uploadedFileId,  // ✅ Store the TblAppbinary ID
                             UserDetailsId = userDetails.Id,
                             RecrtmntRequirementChecklistId = input.RecrtmntRequirementCheckListId,
                             Status = (int)RequirementsStatusEnum.Pending,
@@ -1888,18 +2031,11 @@ namespace BrigadaCareersV3Library.AuthServices
                         response.IsSuccess = true;
                         return response;
                     }
-                    // UPDATE: Requirement exists
                     else
                     {
-                        await UpdateProfileImageAsync(
-                            getReq.UseReqId.Value,
-                            input.UserReqFileBase64,
-                            input.UserReqFileName,
-                            input.UserReqFileContentType,
-                            "User File Requirements " + currentUser.FirstName
-                        );
-
-                        getReq.Status = (int)RequirementsStatusEnum.Pending; // Reset to pending on update
+                        // UPDATE: Existing record, update with new file reference
+                        getReq.UseReqId = uploadedFileId;  // ✅ Store the new TblAppbinary ID
+                        getReq.Status = (int)RequirementsStatusEnum.Pending; // reset to pending on update
                         await _appContext.SaveChangesAsync();
 
                         response.Data = input.RemoveUserReqFile ? "Replaced" : "Updated";
@@ -1908,6 +2044,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     }
                 }
 
+                // No changes made
                 response.Data = "No changes";
                 response.IsSuccess = true;
                 return response;
@@ -1921,12 +2058,11 @@ namespace BrigadaCareersV3Library.AuthServices
             }
         }
 
+
         public async Task<ApiResponseMessage<IList<GetRequirmentsDto>>> GetRequirementsV1()
         {
             try
             {
-
-
                 // First, get data from HRMS context
                 var hrmsReqs = await _dbContext.RecrtmntRequirementChecklists
                     .Select(hrmsreq => new
@@ -1939,10 +2075,11 @@ namespace BrigadaCareersV3Library.AuthServices
                 // Get the IDs to filter the second query
                 var hrmsReqIds = hrmsReqs.Select(h => h.Id).ToList();
 
-                // Second, get data from App context
+                // Second, get data from App context with binary information
                 var userReqsWithBinaries = await (
                     from userreq in _appContext.TblUserRequirements
                     where hrmsReqIds.Contains(userreq.RecrtmntRequirementChecklistId)
+                          && !userreq.IsDeleted  
                     join appbinary in _appContext.TblAppbinaries
                         on userreq.UseReqId equals appbinary.Id into appbinaryGroup
                     from appbinary in appbinaryGroup.DefaultIfEmpty()
@@ -1952,11 +2089,12 @@ namespace BrigadaCareersV3Library.AuthServices
                         FileName = appbinary != null ? appbinary.FileName : null,
                         DateUpload = appbinary != null ? appbinary.CreationTime : (DateTime?)null,
                         userreq.Remarks,
-                        userreq.Status
+                        userreq.Status,
+                        S3Key = appbinary != null ? appbinary.S3key : null  
                     }
                 ).ToListAsync();
 
-                // Join in memory
+                // Join in memory and build final result
                 var getReq = hrmsReqs
                     .GroupJoin(
                         userReqsWithBinaries,
@@ -1969,26 +2107,13 @@ namespace BrigadaCareersV3Library.AuthServices
                         {
                             Id = x.h.Id,
                             CheckListName = x.h.Name,
-                            FileName = u?.FileName! ?? "-",
-                            DateUpload = u?.DateUpload?.ToString("MMM dd, yyyy")! ?? "-",
+                            FileName = u?.FileName ?? "-",
+                            DateUpload = u?.DateUpload?.ToString("MMM dd, yyyy") ?? "-",
                             Remarks = u?.Remarks ?? "-",
-                            Status = u != null ? ((RequirementsStatusEnum)u.Status!).ToString() : string.Empty
-
-
+                            Status = u != null ? ((RequirementsStatusEnum)u.Status).ToString() : string.Empty,
+                            ImageUrl = u?.S3Key != null ? _s3Service.GetFileUrl(u.S3Key) : null 
                         })
                     .ToList();
-
-
-
-
-                //var _data = await _dbContext.RecrtmntRequirementChecklists
-                //    .Where(g => !g.IsDeleted && !g.Name.ToLower().Contains("others"))
-                //    .Select(x => new GetRequirmentsDto
-                //    {
-                //        Id = x.Id,
-                //        Name = x.Name.ToLower()
-                //    })
-                //    .ToListAsync();
 
                 return new ApiResponseMessage<IList<GetRequirmentsDto>>
                 {
@@ -1996,8 +2121,6 @@ namespace BrigadaCareersV3Library.AuthServices
                     IsSuccess = true,
                     ErrorMessage = ""
                 };
-
-
             }
             catch (Exception ex)
             {
@@ -2005,7 +2128,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     Data = null,
                     IsSuccess = false,
-                    ErrorMessage = ex.InnerException!.Message
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message  // ✅ Added null-coalescing
                 };
             }
         }

@@ -10,12 +10,13 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
     public class GetUserCertificateDto
     {
         public Guid Id { get; set; }
+        public Guid AppBinaryId { get; set; }
         public string Name { get; set; }
         public string Issuer { get; set; }
         public string Highlights { get; set; }
         public DateTime? DateAchieved { get; set; }
         public CertificateTypeEnum Type { get; set; }
-        public string ImageUrl { get; set; }  // ✅ Changed from Byte[] to URL
-        public string FileName { get; set; }  // ✅ Add this
+        public string ImageUrl { get; set; }  
+        public string FileName { get; set; }  
     }
 }

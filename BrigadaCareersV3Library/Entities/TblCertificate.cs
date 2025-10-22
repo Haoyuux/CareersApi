@@ -19,13 +19,13 @@ public partial class TblCertificate
 
     public int CertificateType { get; set; }
 
-    public Guid? CertificateTypeId { get; set; }
+    public Guid? AppBinaryId { get; set; }
 
     public bool IsDeleted { get; set; }
 
     public DateTime CreationTime { get; set; }
 
-    public virtual TblAppbinary? CertificateTypeNavigation { get; set; }
+    public virtual TblAppbinary? AppBinary { get; set; }
 
     public virtual TblUserDetail UserIdFkNavigation { get; set; } = null!;
 }

@@ -320,9 +320,9 @@ namespace BrigadaCareersV3.Controllers
 
         [Authorize]
         [HttpDelete("DeleteUserCertificate")]
-        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserCertificate(Guid certificateId)
+        public async Task<ActionResult<ApiResponseMessage<string>>> DeleteUserCertificate(Guid certificateId, Guid appBinaryID)
         {
-            var result = await _userAuthentication.DeleteUserCertificate(certificateId);
+            var result = await _userAuthentication.DeleteUserCertificate(certificateId, appBinaryID);
             if (result != null)
             {
                 return Ok(result);

@@ -104,7 +104,7 @@ namespace BrigadaCareersV3Library.Amazon
         // -----------------------------
         // PUBLIC: Upload and Save
         // -----------------------------
-        public async Task<TblAppbinary> UploadFileAsync(
+        public async Task<Guid> UploadFileAsync(
             string base64Data,
             string fileName,
             string contentType,
@@ -131,7 +131,6 @@ namespace BrigadaCareersV3Library.Amazon
                 throw new InvalidOperationException("The input string is not valid Base64 data. Ensure you send only the encoded portion.");
             }
 
-            // 🔹 No using here — keep stream alive during async PutObjectAsync
             var fileStream = new MemoryStream(fileBytes);
 
             try
@@ -164,14 +163,15 @@ namespace BrigadaCareersV3Library.Amazon
                 await _appDbContext.TblAppbinaries.AddAsync(fileEntity);
                 await _appDbContext.SaveChangesAsync();
 
-                return fileEntity;
+                // ✅ Return just the Guid
+                return fileEntity.Id;
             }
             finally
             {
-                // Safe cleanup after upload completes
                 await fileStream.DisposeAsync();
             }
         }
+
 
         // -----------------------------
         // PRIVATE: Delete from S3
