@@ -297,7 +297,7 @@ namespace BrigadaCareersV3Library.Amazon
             };
 
             return $"{baseFolder}/{subFolder}";
-        }
+        }   
 
         // -----------------------------
         // PRIVATE: Sanitize file names

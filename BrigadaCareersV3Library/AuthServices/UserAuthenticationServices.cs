@@ -2016,7 +2016,7 @@ namespace BrigadaCareersV3Library.AuthServices
                         var insertUserReq = new TblUserRequirement
                         {
                             Id = Guid.NewGuid(),
-                            UseReqId = uploadedFileId,  // ✅ Store the TblAppbinary ID
+                            UseReqId = uploadedFileId, 
                             UserDetailsId = userDetails.Id,
                             RecrtmntRequirementChecklistId = input.RecrtmntRequirementCheckListId,
                             Status = (int)RequirementsStatusEnum.Pending,
@@ -2057,12 +2057,13 @@ namespace BrigadaCareersV3Library.AuthServices
                 return response;
             }
         }
-
-
         public async Task<ApiResponseMessage<IList<GetRequirmentsDto>>> GetRequirementsV1()
         {
             try
             {
+
+                var currentUser = await GetCurrentUserIdAsync();
+
                 // First, get data from HRMS context
                 var hrmsReqs = await _dbContext.RecrtmntRequirementChecklists
                     .Select(hrmsreq => new
@@ -2079,7 +2080,8 @@ namespace BrigadaCareersV3Library.AuthServices
                 var userReqsWithBinaries = await (
                     from userreq in _appContext.TblUserRequirements
                     where hrmsReqIds.Contains(userreq.RecrtmntRequirementChecklistId)
-                          && !userreq.IsDeleted  
+                          && !userreq.IsDeleted
+                          && userreq.UserDetailsId == currentUser.Id  
                     join appbinary in _appContext.TblAppbinaries
                         on userreq.UseReqId equals appbinary.Id into appbinaryGroup
                     from appbinary in appbinaryGroup.DefaultIfEmpty()
@@ -2090,7 +2092,7 @@ namespace BrigadaCareersV3Library.AuthServices
                         DateUpload = appbinary != null ? appbinary.CreationTime : (DateTime?)null,
                         userreq.Remarks,
                         userreq.Status,
-                        S3Key = appbinary != null ? appbinary.S3key : null  
+                        S3Key = appbinary != null ? appbinary.S3key : null
                     }
                 ).ToListAsync();
 
@@ -2128,7 +2130,7 @@ namespace BrigadaCareersV3Library.AuthServices
                 {
                     Data = null,
                     IsSuccess = false,
-                    ErrorMessage = ex.InnerException?.Message ?? ex.Message  // ✅ Added null-coalescing
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message  
                 };
             }
         }
@@ -2199,7 +2201,7 @@ namespace BrigadaCareersV3Library.AuthServices
                     };
                 }
 
-                var validationResult = await ValidationPrimarySecondary(currentUser.UserId);
+                var validationResult = await ValidationPrimarySecondary(currentUser.Id);
                 if (validationResult.IsSuccess)
                 {
                     return new ApiResponseMessage<string>
@@ -2443,6 +2445,123 @@ namespace BrigadaCareersV3Library.AuthServices
                 Data = null,
                 IsSuccess = false,
                 ErrorMessage = errorMessage
+            };
+        }
+
+        public async Task<ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>> GetJobApplicationStatus()
+        {
+            try
+            {
+
+                var currentUser = await GetCurrentUserIdAsync();
+
+
+                var applicantMasterlist = await _dbContext.RecrtmntApplicantMasterlists
+                    .FirstOrDefaultAsync(x => x.UserId == currentUser.UserId);
+
+                if (applicantMasterlist is null)
+                {
+                    return new ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>
+                    {
+                        Data = new List<ApplicantJobLogsHeaderDto>(),
+                        IsSuccess = true,
+                        ErrorMessage = string.Empty
+                    };
+                }
+
+                var jobLogsQuery = from applicant in _dbContext.RecrtmntApplicantMasterlists
+                                   join postingDetail in _dbContext.RecrtmntJobPostingDetails
+                                       on applicant.Id equals postingDetail.RecrtmntApplicantMasterlistId
+                                   join auditLog in _dbContext.RecrtmntJobPostingDetailAuditLogs
+                                       on postingDetail.Id equals auditLog.RecrtmntJobPostingDetailId
+                                   join header in _dbContext.RecrtmntJobPostingHeaders
+                                       on postingDetail.RecrtmntJobPostingHeaderId equals header.Id
+                                   join mrDetails in _dbContext.Mrdetails
+                                       on header.MrdetailId equals mrDetails.Id
+                                   join jobManagement in _dbContext.PlantillaJobMngmnts
+                                       on mrDetails.PlantillaJobMngmntId equals jobManagement.Id
+                                   join busUnit in _dbContext.Hr201businessUnits
+                                       on jobManagement.Hr201businessUnitId equals busUnit.Id
+                                   join location in _dbContext.Hr201locations
+                                       on jobManagement.Hr201locationId equals location.Id
+                                   join jobTitle in _dbContext.PlantillaJobTitles
+                                       on jobManagement.PlantillaJobTitleId equals jobTitle.Id
+                                   where applicant.Id == applicantMasterlist.Id
+                                       && auditLog.IsHiddenLog == false
+                                   orderby auditLog.CreationTime ascending
+                                   select new
+                                   {
+                                       JobName = jobTitle.Name,
+                                       businessUnitName = busUnit.Name,
+                                       Location = location.Name,
+                                       DescriptionLogs = auditLog.Description,
+                                       Status = postingDetail.Status,
+                                       JobStatus = header.Status,
+                                       CreationTime = auditLog.CreationTime,
+                                       MrfCategoryString = mrDetails.Mrfcategory,
+                                   };
+
+                var jobLogsData = await jobLogsQuery.ToListAsync();
+
+                var groupedLogs = jobLogsData
+                    .GroupBy(x => new { x.JobName, x.Status, x.JobStatus, x.MrfCategoryString, x.Location, x.businessUnitName })
+                    .Select(group => new ApplicantJobLogsHeaderDto
+                    {
+                        JobName = group.Key.JobName,
+                        status = group.Key.Status,
+                        jobstatus = group.Key.JobStatus,
+                        MrfCategory = group.Key.MrfCategoryString != null
+                        ? ((MRFCategory)ConvertToNewEnum(group.Key.MrfCategoryString)).ToString()
+                        : string.Empty,
+                        LocationName = group.Key.Location,
+                        BusinessUnitName = group.Key.businessUnitName,
+                        ApplicantJobLogsDtos = group.Select(item => new ApplicantJobLogsDto
+                        {
+                            JobNameMother = item.JobName,
+                            DescriptionLogs = ExtractDescription(item.DescriptionLogs),
+                            status = item.Status,
+                            CreationTime = item.CreationTime
+                        }).ToList()
+                    })
+                    .ToList();
+
+                return new ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>
+                {
+                    Data = groupedLogs,
+                    IsSuccess = true,
+                    ErrorMessage = string.Empty
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>
+                {
+                    Data = new List<ApplicantJobLogsHeaderDto>(),
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message
+                };
+            }
+        }
+
+        private static string ExtractDescription(string description)
+        {
+            if (string.IsNullOrEmpty(description))
+                return string.Empty;
+
+            return description.Contains(";")
+                ? description.Split(';')[0]
+                : description;
+        }
+
+        private static int ConvertToNewEnum(int oldValue)
+        {
+            return oldValue switch
+            {
+                0 => 0, // Regular_FullTime -> FullTime
+                1 => 1, // Regular_PartTime -> PartTime
+                2 => 0, // Casual_Full_Time -> FullTime
+                3 => 1, // Casual_Part_Time -> PartTime
+                _ => oldValue // Keep other values as-is
             };
         }
     }

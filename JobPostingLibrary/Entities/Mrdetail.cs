@@ -67,6 +67,22 @@ public partial class Mrdetail
 
     public bool IsFinalized { get; set; }
 
+    public decimal ProposedDailyRate { get; set; }
+
+    public string? ReplacementReason { get; set; }
+
+    public int SalaryCategory { get; set; }
+
+    public int Mrfcategory { get; set; }
+
+    public long? ApproverUserId { get; set; }
+
+    public DateTime? TimeApproved { get; set; }
+
+    public long? RequestorUserId { get; set; }
+
+    public DateTime? TimeRequested { get; set; }
+
     public virtual Hr201allowanceType? Hr201allowanceType { get; set; }
 
     public virtual PlantillaJobMngmnt? PlantillaJobMngmnt { get; set; }

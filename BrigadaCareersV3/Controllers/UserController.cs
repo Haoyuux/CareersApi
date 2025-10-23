@@ -461,5 +461,17 @@ namespace BrigadaCareersV3.Controllers
             }
         }
 
+        [Authorize]
+        [HttpGet("GetJobApplicationStatus")]
+        public async Task<ActionResult<ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>>> GetJobApplicationStatus()
+        {
+            var result = await _userAuthentication.GetJobApplicationStatus();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
     }
 }

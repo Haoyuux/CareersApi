@@ -77,6 +77,8 @@ public partial class PlantillaJobMngmnt
 
     public bool InActive { get; set; }
 
+    public decimal? CashbondAmount { get; set; }
+
     public virtual Hr201businessUnit? Hr201businessUnit { get; set; }
 
     public virtual Hr201location? Hr201location { get; set; }

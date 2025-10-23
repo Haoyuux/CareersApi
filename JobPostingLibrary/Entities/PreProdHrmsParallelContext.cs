@@ -74,7 +74,6 @@ public partial class PreProdHrmsParallelContext : DbContext
             optionsBuilder.UseSqlServer("HrmsConnection");
         }
     }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AppBinaryObject>(entity =>
@@ -324,7 +323,9 @@ public partial class PreProdHrmsParallelContext : DbContext
             entity.Property(e => e.Allowance).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ExistingMrfsheet).HasColumnName("existingMRFSheet");
             entity.Property(e => e.Hr201allowanceTypeId).HasColumnName("HR201AllowanceTypeId");
+            entity.Property(e => e.Mrfcategory).HasColumnName("MRFCategory");
             entity.Property(e => e.MrheaderId).HasColumnName("MRHeaderId");
+            entity.Property(e => e.ProposedDailyRate).HasColumnType("decimal(18, 2)");
 
             entity.HasOne(d => d.Hr201allowanceType).WithMany(p => p.Mrdetails).HasForeignKey(d => d.Hr201allowanceTypeId);
 
@@ -360,6 +361,7 @@ public partial class PreProdHrmsParallelContext : DbContext
             entity.HasIndex(e => e.TenantId, "IX_PlantillaJobMngmnts_TenantId");
 
             entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CashbondAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Hr201businessUnitId).HasColumnName("HR201BusinessUnitId");
             entity.Property(e => e.Hr201departmentId).HasColumnName("HR201DepartmentId");
             entity.Property(e => e.Hr201locationId).HasColumnName("HR201LocationId");

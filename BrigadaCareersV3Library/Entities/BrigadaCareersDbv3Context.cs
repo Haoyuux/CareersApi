@@ -52,6 +52,7 @@ public partial class BrigadaCareersDbv3Context : DbContext
             optionsBuilder.UseSqlServer("DefaultCon");
         }
     }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AspNetRole>(entity =>
