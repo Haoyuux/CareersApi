@@ -473,5 +473,17 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(result);
         }
 
+        [Authorize]
+        [HttpGet("GetUserJobOffer")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetUserJobOfferDtoV1>>>> GetUserJobOffer()
+        {
+            var result = await _userAuthentication.GetUserJobOffer();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
     }
 }

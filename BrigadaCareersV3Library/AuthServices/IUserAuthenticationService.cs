@@ -43,5 +43,6 @@ namespace BrigadaCareersV3Library.AuthServices
 
         Task<ApiResponseMessage<string>> InsertToApplicantMasterList([FromBody] applicantdataDto applyDto);
         Task<ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>> GetJobApplicationStatus();
+        Task<ApiResponseMessage<IList<GetUserJobOfferDtoV1>>> GetUserJobOffer();
     }
 }

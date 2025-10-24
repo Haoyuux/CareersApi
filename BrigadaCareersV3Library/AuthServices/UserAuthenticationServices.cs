@@ -2564,5 +2564,100 @@ namespace BrigadaCareersV3Library.AuthServices
                 _ => oldValue // Keep other values as-is
             };
         }
+
+        public async Task<ApiResponseMessage<IList<GetUserJobOfferDtoV1>>> GetUserJobOffer()
+        {
+            try
+            {
+
+                var currentUser = await GetCurrentUserIdAsync();
+
+          
+                var rawData = await (
+                    from applicant in _dbContext.RecrtmntApplicantMasterlists
+                    join jobPosting in _dbContext.RecrtmntJobPostingDetails
+                        on applicant.Id equals jobPosting.RecrtmntApplicantMasterlistId
+                    join contract in _dbContext.Contracts
+                        on jobPosting.Id equals contract.RecrtmntJobPostDetailId
+                    join header in _dbContext.RecrtmntJobPostingHeaders
+                        on jobPosting.RecrtmntJobPostingHeaderId equals header.Id
+                    join mrDetails in _dbContext.Mrdetails
+                        on header.MrdetailId equals mrDetails.Id
+                    join jobTitle in _dbContext.PlantillaJobTitles
+                        on contract.PlantillaJobTitleId equals jobTitle.Id into jobTitleGroup
+                    from jobTitle in jobTitleGroup.DefaultIfEmpty()
+                    join jobManagement in _dbContext.PlantillaJobMngmnts
+                        on jobTitle.Id equals jobManagement.PlantillaJobTitleId
+                    join busUnit in _dbContext.Hr201businessUnits
+                        on jobManagement.Hr201businessUnitId equals busUnit.Id
+                    join location in _dbContext.Hr201locations
+                        on jobManagement.Hr201locationId equals location.Id
+                    join appbinary in _dbContext.AppBinaryObjects
+                        on contract.JobOfferPdf equals appbinary.Id into appbinaryGroup
+                    from appbinary in appbinaryGroup.DefaultIfEmpty()
+                    where applicant.UserId == currentUser.UserId && !contract.IsDeleted
+                    select new
+                    {
+                        contract.Id,
+                        JobTitle = jobTitle!.Name,
+                        contract.StartDate,
+                        contract.NoLaterThan,
+                        contract.IsRejected,
+                        contract.IsConfirmedByPmd,
+                        contract.RejectionRemarks,
+                        PdfByte = appbinary != null ? appbinary.Bytes : null,
+                        BusinessUnitName = busUnit.Name,
+                        LocationName = location.Name,
+                        MrfCategoryString = mrDetails.Mrfcategory
+                    }
+                ).AsNoTracking().ToListAsync();
+
+
+                var result = rawData
+                    .GroupBy(r => r.Id)
+                    .Select(g =>
+                    {
+                        var x = g.First();
+                        return new GetUserJobOfferDtoV1
+                        {
+                            JobTitle = x.JobTitle,
+                            ContractId = x.Id,
+                            StartDate = x.StartDate.ToString("MMM dd, yyyy"),
+                            NoLaterThan = x.NoLaterThan.ToString("MMM dd, yyyy"),
+                            isRejected = x.IsRejected,
+                            isConfirmed = x.IsConfirmedByPmd,
+                            RejectionRemarks = x.RejectionRemarks,
+                            PdfByte = x.PdfByte,
+                            BusinessUnitName = x.BusinessUnitName,
+                            LocationName = x.LocationName,
+                            MrfCategory = Enum.IsDefined(typeof(MRFCategory), x.MrfCategoryString)
+                            ? ((MRFCategory)x.MrfCategoryString).ToString()
+                            : string.Empty
+                        };
+                    })
+                    .ToList();
+
+
+
+
+
+
+                return new ApiResponseMessage<IList<GetUserJobOfferDtoV1>>
+                {
+                    Data = result,
+                    IsSuccess = true,
+                    ErrorMessage = string.Empty
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<IList<GetUserJobOfferDtoV1>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message
+                };
+            }
+        }
     }
 }
