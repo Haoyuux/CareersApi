@@ -485,5 +485,24 @@ namespace BrigadaCareersV3.Controllers
             return BadRequest(result);
         }
 
+        [HttpPost("UpdateJobOfferStatus")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> UpdateJobOfferStatus([FromBody] UpdateJobOfferStatusDto Dto)
+        {
+            try
+            {
+                var result = await _userAuthentication.UpdateJobOfferStatus(Dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
     }
 }

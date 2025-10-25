@@ -2659,5 +2659,53 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
+
+        public async Task<ApiResponseMessage<string>> UpdateJobOfferStatus(UpdateJobOfferStatusDto Dto)
+        {
+            try
+            {
+                var apiMessage = "";
+                var updateStats = await _dbContext.Contracts.FirstOrDefaultAsync(x => x.Id == Dto.ContractId);
+                if (updateStats != null)
+                {
+                    if (Dto.IsRejected == false)
+                    {
+                        updateStats.IsRejected = false;
+                        updateStats.RejectionRemarks = null;
+                    }
+                    else
+                    {
+                        updateStats.IsRejected = true;
+                        updateStats.RejectionRemarks = Dto.RejectionRemarks;
+                    }
+
+                    _dbContext.Contracts.Update(updateStats);
+                    await _dbContext.SaveChangesAsync();
+
+                    apiMessage = "Saved";
+                }
+                else
+                {
+                    apiMessage = "No Data";
+                }
+
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException?.Message ?? ex.Message
+                };
+            }
+        }
     }
 }
