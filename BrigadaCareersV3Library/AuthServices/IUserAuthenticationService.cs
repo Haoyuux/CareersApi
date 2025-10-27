@@ -45,5 +45,7 @@ namespace BrigadaCareersV3Library.AuthServices
         Task<ApiResponseMessage<IList<ApplicantJobLogsHeaderDto>>> GetJobApplicationStatus();
         Task<ApiResponseMessage<IList<GetUserJobOfferDtoV1>>> GetUserJobOffer();
         Task<ApiResponseMessage<string>> UpdateJobOfferStatus(UpdateJobOfferStatusDto Dto);
+        Task<ApiResponseMessage<IList<GetAppointmentDto>>> GetAppointment();
+        Task<ApiResponseMessage<string>> UpdateUserAppointment(UpdateUserAppointmentDto Dto);
     }
 }

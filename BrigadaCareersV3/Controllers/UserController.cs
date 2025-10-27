@@ -504,5 +504,36 @@ namespace BrigadaCareersV3.Controllers
             }
         }
 
+        [Authorize]
+        [HttpGet("GetAppointment")]
+        public async Task<ActionResult<ApiResponseMessage<IList<GetAppointmentDto>>>> GetAppointment()
+        {
+            var result = await _userAuthentication.GetAppointment();
+            if (result != null)
+            {
+                return Ok(result);
+            }
+            return BadRequest(result);
+        }
+
+        [HttpPost("UpdateUserAppointment")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> UpdateUserAppointment([FromBody] UpdateUserAppointmentDto Dto)
+        {
+            try
+            {
+                var result = await _userAuthentication.UpdateUserAppointment(Dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
     }
 }

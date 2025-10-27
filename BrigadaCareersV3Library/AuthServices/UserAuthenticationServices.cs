@@ -2707,5 +2707,123 @@ namespace BrigadaCareersV3Library.AuthServices
                 };
             }
         }
+
+        public async Task<ApiResponseMessage<IList<GetAppointmentDto>>> GetAppointment()
+        {
+            try
+            {
+
+                var currentUser = await GetCurrentUserIdAsync();
+
+                var _result = await (from masterlist in _dbContext.RecrtmntApplicantMasterlists
+                                     join jobpostcont in _dbContext.RecrtmntJobPostingDetails
+                                     on masterlist.Id equals jobpostcont.RecrtmntApplicantMasterlistId
+                                     join appointments in _dbContext.Hr201appointments
+                                     on jobpostcont.Id equals appointments.RecrtmntJobPostingDetailId
+                                     join jobtitle in _dbContext.PlantillaJobTitles
+                                     on jobpostcont.PlantillaJobTitleId equals jobtitle.Id
+                                     where masterlist.UserId == currentUser.UserId
+                                     select new GetAppointmentDto
+                                     {
+                                         AppointmentId = appointments.Id,
+                                         Events = appointments.Name!,
+                                         ScheduledDateTime = appointments.ScheduledDateTime,
+                                         JobTitle = jobtitle.Name!,
+                                         status = appointments.Status,
+                                         isConfirmed = appointments.IsConfirmed,
+                                         Remarks = appointments.Message
+
+
+                                     }).ToListAsync();
+
+                if (_result is null)
+                {
+
+                    return new ApiResponseMessage<IList<GetAppointmentDto>>
+                    {
+                        Data = null!,
+                        IsSuccess = false,
+                        ErrorMessage = ""
+                    };
+                }
+
+
+                return new ApiResponseMessage<IList<GetAppointmentDto>>
+                {
+                    Data = _result,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<IList<GetAppointmentDto>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException!.Message
+                };
+            }
+        }
+
+        public async Task<ApiResponseMessage<string>> UpdateUserAppointment(UpdateUserAppointmentDto Dto)
+        {
+            try
+            {
+
+                var update = await _dbContext.Hr201appointments.FirstOrDefaultAsync(x => x.Id == Dto.Id);
+                var apiMessage = "";
+
+                if (update is not null)
+                {
+
+                    if (Dto.Status == 1)
+                    {
+                        //GOING
+                        update.Status = 1;
+                        update.Message = "";
+                        apiMessage = "Success";
+
+
+                    }
+                    if (Dto.Status == 2)
+                    {
+                        //NOT GOING w/ REMARKS
+                        update.Status = 2;
+                        update.Message = Dto.Remarks;
+                        apiMessage = "Success";
+                    }
+
+                    _dbContext.Hr201appointments.Update(update);
+                    await _dbContext.SaveChangesAsync();
+                }
+                else
+                {
+                    apiMessage = "No Data";
+                }
+
+                return new ApiResponseMessage<string>
+                {
+                    Data = apiMessage,
+                    IsSuccess = update is not null ? true : false,
+                    ErrorMessage = ""
+
+                };
+
+
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<string>
+                {
+                    Data = "Failed",
+                    IsSuccess = false,
+                    ErrorMessage = ex.InnerException!.Message
+
+                };
+
+
+            }
+        }
     }
 }
