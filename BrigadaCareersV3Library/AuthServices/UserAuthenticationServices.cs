@@ -380,6 +380,73 @@ namespace BrigadaCareersV3Library.AuthServices
                 // ignore cleanup failures
             }
         }
+        public async Task<ApiResponseMessage<UserRoleDto>> GetUserRoleByRefreshToken(string refreshToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    return new ApiResponseMessage<UserRoleDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "Refresh token is required"
+                    };
+                }
+
+                // Find user by refresh token
+                var user = await FindUserByRefreshTokenAsync(refreshToken);
+                if (user == null)
+                {
+                    return new ApiResponseMessage<UserRoleDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "Invalid refresh token or user not found"
+                    };
+                }
+
+                // Validate if the refresh token is still valid
+                var isValidRefreshToken = await ValidateRefreshTokenAsync(user, refreshToken);
+                if (!isValidRefreshToken)
+                {
+                    return new ApiResponseMessage<UserRoleDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "Refresh token is expired or invalid"
+                    };
+                }
+
+                // Get user roles
+                var roles = await _userManager.GetRolesAsync(user);
+
+                var userRoleInfo = new UserRoleDto
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName!,
+                    Roles = roles.ToList(),
+                    IsAdmin = roles.Contains(UserRole.Admin),
+                    IsUser = roles.Contains(UserRole.User)
+                };
+
+                return new ApiResponseMessage<UserRoleDto>
+                {
+                    Data = userRoleInfo,
+                    IsSuccess = true,
+                    ErrorMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseMessage<UserRoleDto>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
         public async Task<ApiResponseMessage<UserDto>> getUserProfileDetails()
         {
             try

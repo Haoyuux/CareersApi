@@ -134,6 +134,44 @@ namespace BrigadaCareersV3.Controllers
             return Ok(result);
         }
 
+     
+        [HttpGet("GetUserRoleByRefreshToken")]
+        public async Task<ActionResult<ApiResponseMessage<UserRoleDto>>> GetUserRoleByRefreshToken()
+        {
+            try
+            {
+                // Get refresh token from cookie
+                if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken) ||
+                    string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    return Unauthorized(new ApiResponseMessage<UserRoleDto>
+                    {
+                        Data = null,
+                        IsSuccess = false,
+                        ErrorMessage = "No refresh token found in cookies"
+                    });
+                }
+
+                var result = await _userAuthentication.GetUserRoleByRefreshToken(refreshToken);
+
+                if (!result.IsSuccess)
+                {
+                    return Unauthorized(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ApiResponseMessage<UserRoleDto>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
         [HttpPost("InsertOrUpdateUserProfile")]
         public async Task<ActionResult<ApiResponseMessage<string>>> InsertOrUpdateUserProfile([FromBody] InsertOrUpdateUserProfileDto input)
         {

@@ -25,8 +25,8 @@ namespace BrigadaCareersV3Library.Dto.AuthDto
         public string? Address { get; set; }
         public string? AboutMe { get; set; }
         public string? StreetDetails { get; set; }
-        public string UserProfileImage { get; set; }
-        public string UserCoverPhotoImage { get; set; }
-        public string UserResumeFile { get; set; }
+        public string? UserProfileImage { get; set; }
+        public string? UserCoverPhotoImage { get; set; }
+        public string? UserResumeFile { get; set; }
     }
 }
