@@ -102,28 +102,23 @@ namespace BrigadaCareersV3.Controllers
             return Unauthorized(result);
         }
 
-        [Authorize]
+        [AllowAnonymous] 
         [HttpPost("logout")]
         public async Task<ActionResult<ApiResponseMessage<bool>>> Logout()
         {
             var refreshToken = Request.Cookies["refreshToken"];
             var result = await _userAuthentication.LogoutAsync(refreshToken);
 
-            if (result.IsSuccess)
+            
+            Response.Cookies.Delete("refreshToken", new CookieOptions
             {
-                // Delete cookie with matching flags/path
-                Response.Cookies.Delete("refreshToken", new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = "/"
-                });
+                HttpOnly = true,
+                Secure = false, 
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            });
 
-                return Ok(result);
-            }
-
-            return BadRequest(result);
+            return Ok(result);
         }
 
         [Authorize]
