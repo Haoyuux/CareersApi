@@ -2,7 +2,9 @@
 using BrigadaCareersV3Library.Auth;
 using BrigadaCareersV3Library.AuthServices;
 using BrigadaCareersV3Library.Dto.AuthDto;
+using BrigadaCareersV3Library.Dto.Enums;
 using BrigadaCareersV3Library.Dto.UserDto;
+using BrigadaCareersV3Library.OtpServices;
 using JobPostingLibrary.HrmsDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -21,12 +23,14 @@ namespace BrigadaCareersV3.Controllers
         private readonly IUserAuthenticationService _userAuthentication;
         private readonly HttpClient _http;
         private readonly IHttpClientFactory _httpFactory;
+        private readonly OtpService _otpService;
 
-        public UserController(IUserAuthenticationService userAuthentication, HttpClient http, IHttpClientFactory httpFactory)
+        public UserController(IUserAuthenticationService userAuthentication, HttpClient http, IHttpClientFactory httpFactory, OtpService otp)
         {
             _userAuthentication = userAuthentication;
             _http = http;
             _httpFactory = httpFactory;
+            _otpService = otp;
         }
 
 
@@ -120,6 +124,137 @@ namespace BrigadaCareersV3.Controllers
 
             return Ok(result);
         }
+
+        //[HttpPost("send-otp")]
+        //public async Task<ActionResult<ApiResponseMessage<string>>> SendOtp(string email, string firstname, string username)
+        //{
+        //    var result = await _otpService.GenerateAndSendOtpAsync(email, firstname, username);
+        //    return Ok(result);
+        //}
+
+        //[HttpPost("verify-otp")]
+        //public async Task<ActionResult<ApiResponseMessage<bool>>> VerifyOtp(string email, string otp)
+        //{
+        //    var result = await _otpService.VerifyOtp(email, otp);
+
+        //    if (result.IsSuccess)
+        //        _otpService.RemoveOtp(email);
+
+        //    return Ok(result);
+        //}
+
+
+
+        // ---------------------------------------
+        // REGISTRATION: Send OTP
+        // ---------------------------------------
+        [HttpPost("register/send-otp")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> SendRegistrationOtp(
+            [FromQuery] string email,
+            [FromQuery] string firstname,
+            [FromQuery] string username)
+        {
+            var result = await _otpService.GenerateAndSendOtpAsync(
+                email,
+                firstname,
+                username,
+                OtpPurpose.Registration
+            );
+            return Ok(result);
+        }
+
+        // ---------------------------------------
+        // PASSWORD RESET: Send OTP
+        // ---------------------------------------
+        [HttpPost("forgot-password/send-otp")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> SendPasswordResetOtp(
+            [FromQuery] string email,
+            [FromQuery] string firstname)
+        {
+            var result = await _otpService.GenerateAndSendOtpAsync(
+                email,
+                firstname,
+                "", // Username not needed for password reset
+                OtpPurpose.PasswordReset
+            );
+            return Ok(result);
+        }
+
+        // ---------------------------------------
+        // VERIFY OTP (Works for both Registration and Password Reset)
+        // ---------------------------------------
+        [HttpPost("verify-otp")]
+        public async Task<ActionResult<ApiResponseMessage<bool>>> VerifyOtp(
+            [FromQuery] string email,
+            [FromQuery] string otp)
+        {
+            var result = await _otpService.VerifyOtp(email, otp);
+            if (result.IsSuccess)
+                _otpService.RemoveOtp(email);
+            return Ok(result);
+        }
+
+        // ---------------------------------------
+        // COMPLETE REGISTRATION (After OTP Verification)
+        // ---------------------------------------
+        [HttpPost("register/complete")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> CompleteRegistration(
+            [FromBody] CompleteRegistrationRequest request)
+        {
+            // Your registration logic here
+            // This is called after OTP is verified successfully
+
+            var response = new ApiResponseMessage<string>
+            {
+                Data = "Registration completed successfully",
+                IsSuccess = true,
+                ErrorMessage = ""
+            };
+
+            return Ok(response);
+        }
+
+        // ---------------------------------------
+        // RESET PASSWORD (After OTP Verification)
+        // ---------------------------------------
+        [HttpPost("forgot-password/reset")]
+        public async Task<ActionResult<ApiResponseMessage<string>>> ResetPassword(
+            [FromBody] ResetPasswordRequest request)
+        {
+            // Verify OTP first
+            var otpResult = await _otpService.VerifyOtp(request.Email, request.Otp);
+
+            if (!otpResult.IsSuccess)
+            {
+                return BadRequest(new ApiResponseMessage<string>
+                {
+                    Data = "Failed",
+                    IsSuccess = false,
+                    ErrorMessage = "Invalid or expired OTP"
+                });
+            }
+
+            // Your password reset logic here
+            // Update password in database using UserManager
+            // Example:
+            // var user = await _userManager.FindByEmailAsync(request.Email);
+            // var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            // await _userManager.ResetPasswordAsync(user, resetToken, request.NewPassword);
+
+            // Remove OTP after successful reset
+            _otpService.RemoveOtp(request.Email);
+
+            var response = new ApiResponseMessage<string>
+            {
+                Data = "Password reset successfully",
+                IsSuccess = true,
+                ErrorMessage = ""
+            };
+
+            return Ok(response);
+        }
+
+
 
         [Authorize]
         [HttpGet("getUserProfileDetails")]

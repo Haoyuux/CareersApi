@@ -15,6 +15,8 @@ using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using BrigadaCareersV3Library.OtpServices;
+using BrigadaCareersV3Library.Dto;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +56,9 @@ builder.Services.AddDbContext<PreProdHrmsParallelContext>(opt =>
 // ---------------------------------------
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddScoped<IHrmsService, HrmsService>();
+builder.Services.AddScoped<OtpService>();
+
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.AddMemoryCache();
 
 // ---------------------------------------
